@@ -60,8 +60,12 @@ jobs:
           git -C Retro68 checkout -q FETCH_HEAD
           git -C Retro68 submodule update -q --init --depth 1
 
+      # build-toolchain.bash already runs make -j$(nproc) for binutils and
+      # GCC; this makes its `cmake --build` (Retro68's host tools and Mac
+      # libraries) parallel too.
       - name: Build Retro68 (m68k only)
         run: |
+          export CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
           mkdir build && cd build
           ../Retro68/build-toolchain.bash --no-ppc --no-carbon --prefix="$PWD/../install" \
             > ../build.log 2>&1 || { tail -100 ../build.log; exit 1; }
