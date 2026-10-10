@@ -11,7 +11,11 @@ description: >
 ## Add a program
 
 1. Create `examples/<name>/<name>.c`. (The Makefile looks in `examples/<name>/`
-   first, then `tests/<name>/`.)
+   first, then `tests/<name>/`.) Every `.c` file in that directory is part of
+   the program, and its headers are on the include path. An app kept in its
+   own repository passes its source directory instead:
+   `make -C path/to/lisa-c PROG=<name> SRCDIR=$PWD/src tool` (output in
+   lisa-c's `build/`).
 2. Workshop (console) program: an ordinary `int main(void)` using stdio.
    Build with `make PROG=<name>`; `make PROG=<name> run` runs it and saves
    `build/emu-<name>/run.png`.

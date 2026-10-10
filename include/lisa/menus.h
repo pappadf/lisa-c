@@ -29,6 +29,11 @@ pascal void DeleteMenu(Integer menuId) LISA_IU(DELETEME);
 pascal void EnableItem(MenuInfo *menu, Integer item) LISA_IU(ENABLEIT);
 pascal void DisableItem(MenuInfo *menu, Integer item) LISA_IU(DISABLEI);
 pascal void CheckItem(MenuInfo *menu, Integer item, Boolean checked) LISA_IU(CHECKITE);
+pascal void MarkItem(MenuInfo *menu, Integer item, Integer whichMark) LISA_IU(MARKITEM);
+pascal void EnableMenu(MenuInfo *menu) LISA_IU(ENABLEME);
+pascal void DisableMenu(MenuInfo *menu) LISA_IU(DISABLEM);
+/* The item whose Apple-key equivalent is ch (whichMenu 0 if none). */
+pascal void MenuKey(char ch, Integer *whichMenu, Integer *whichItem) LISA_IU(MENUKEY);
 pascal void GetItem(MenuInfo *menu, Integer item, unsigned char *itemString) LISA_IU(GETITEM);
 pascal void SetItem(MenuInfo *menu, Integer item, const unsigned char *itemString) LISA_IU(SETITEM);
 

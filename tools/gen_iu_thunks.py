@@ -60,9 +60,12 @@ def main():
         for part in m.group(1).split(','):
             if part.strip().startswith('*'):
                 pointer_types.add(part.strip().lstrip('*').strip())
-    for a, b in re.findall(r'typedef\s+(\w+)\s+(\w+)\s*;', text):  # aliases of pointer types
+    for a, b in re.findall(r'typedef\s+(\w+)\s+(\w+)\s*;', text):  # aliases of known types
         if a in pointer_types:
             pointer_types.add(b)
+        for kind in (BYTE, WORD, LONG):
+            if a in kind:
+                kind.add(b)
     os.makedirs(outdir, exist_ok=True)
     count = 0
     for m in re.finditer(r'pascal\s+([\w\s\*]+?)\s*\b(\w+)\s*\(([^)]*)\)\s*LISA_IU\((\w+)\)\s*;', text):

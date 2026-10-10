@@ -50,5 +50,10 @@ pascal Boolean EventAvail(void) LISA_IU(EVENTAVA);
 pascal void GetMouse(Point *pt) LISA_IU(GETMOUSE);
 pascal Boolean ImActive(void) LISA_IU(IMACTIVE);   /* does this process own the active window? */
 pascal void LetOthersRun(void) LISA_IU(LETOTHER);
+pascal Boolean PeekEvent(EventRecord *event) LISA_IU(PEEKEVEN);   /* next event, left in the queue */
+/* Mouse tracking after a buttonDown: loop while StillDown(), reading GetMouse. */
+pascal Boolean StillDown(void) LISA_IU(STILLDOW);  /* button still down since the buttonDown event? */
+pascal Boolean Button(void) LISA_IU(BUTTON);       /* is the button down now? */
+pascal LongInt Time(void) LISA_IU(TIME);           /* hundredths of a second since startup */
 
 #endif

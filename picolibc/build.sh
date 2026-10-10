@@ -8,7 +8,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VER=1.8.12
 CROSS="${CROSS:?set CROSS to the compiler prefix, e.g. .../bin/m68k-apple-macos-}"
-SRC="${PICOLIBC_SRC:-$HERE/../../references/picolibc-src/picolibc-$VER}"
+SRC="${PICOLIBC_SRC:-$HERE/../build/picolibc-src/picolibc-$VER}"   # downloaded once per build/ tree
 BUILD="$HERE/../build/picolibc"
 PREFIX="$HERE/../build/sysroot"
 if [ ! -d "$SRC" ]; then

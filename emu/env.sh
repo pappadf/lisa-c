@@ -2,7 +2,7 @@
 #
 # The emulator (granny-smith's gs-headless), first found of:
 #   $GS_HEADLESS
-#   build/gs/gs-headless                (make emulator: a release binary)
+#   build/gs/gs-headless                (a granny-smith release binary)
 #   gs-headless on the PATH
 #   ../granny-smith/build/headless/gs-headless   (a checkout next to lisa-c)
 #
@@ -32,7 +32,7 @@ need() {    # need FILE WHAT
 }
 need_emulator() {
     if [ -z "${GS_HEADLESS:-}" ]; then
-        echo "error: no gs-headless: run 'make emulator', or set GS_HEADLESS" >&2
+        echo "error: no gs-headless: set GS_HEADLESS, put it on the PATH or in build/gs/" >&2
         exit 1
     fi
 }

@@ -9,7 +9,9 @@ description: >
 # Writing an Office System desktop tool
 
 Start from `examples/hellotool/hellotool.c` and `hellotool.phrase`; they run the
-whole lifecycle and are covered by `make test-tool-hellotool`.
+whole lifecycle and are covered by `make test-tool-hellotool`. A full
+application (palettes, scroll bars, size control, document files, alerts) is
+LisaPaint, a separate project built with lisa-c (`SRCDIR=`, see lisa-build).
 
 ## What a tool is
 
@@ -22,6 +24,8 @@ Installing: insert the floppy in LOS, choose **Repair** when it says the disk
 is not in the standard format. Repair registers the tool and adds its
 "<name> Paper" stationery. Tear off a document and open it: the Desktop
 Manager starts the tool (`Make_Process`). `emu/run-los-tool.sh` scripts this.
+Opening the *tool* icon itself also starts it, but as `fcNone` with no
+document (no prefix): test with a torn-off document.
 
 ## Startup (order matters)
 
@@ -69,13 +73,68 @@ call `LetOthersRun`, as Apple's tools do.
 
 | Operation | Do |
 |---|---|
-| `fcResume`, `fcNone` | the document window is `ev.who`: `TakeWindow`, draw. No reply. |
-| `fcClose`, `fcSuspend`, `fcPut`, `fcCopy`, `fcShred` | save if needed, then `TellFiler(&err, docClosd, allOk, ev.who)` |
+| `fcResume` | open the document: window `ev.who` (`TakeWindow`), diskfile prefix `fx.thePrefix`. No reply. |
+| `fcNone` | the tool icon was opened: a window but no document (empty prefix) |
+| `fcClose` | make the edits permanent, then `TellFiler(&err, docClosd, allOk, ev.who)` |
+| `fcSuspend` | save the working state (edits kept separate), reply as above |
+| `fcPut`, `fcCopy` | write the document to the new prefix `fx.thePrefix`; reply `docXfered` (fcPut also closes) |
+| `fcShred` | just close: `docClosd, allOk` |
 | `fcTerminate` | leave the loop |
 | anything else | `TellFiler(&err, docClosd, internalError, ev.who)` |
 
-Menu commands: "Set Aside" = `DoFilingCmd(cmdClose)`, "Set Aside Everything" =
-`DoFilingCmd(cmdCloseAll)`.
+On failure reply `docNotClosed`/`docNotXfered` with a reason (`cantWrite`, ...).
+
+**Document files.** The prefix is a volume plus the start of a file name, e.g.
+`-#13-{D103T21}`; name the document's diskfiles by appending to it
+(`-#13-{D103T21}PIC`) and use ordinary file calls (`open`, `write`). If none
+exist yet, it is a new document.
+
+Menu commands:
+- "Set Aside" = `DoFilingCmd(cmdClose)`, "Set Aside Everything" =
+  `DoFilingCmd(cmdCloseAll)`. On LOS 3.1 Set Aside only hides the window: the
+  tool keeps the document open and gets no event; reopening shows it again.
+- "Save & Put Away": save as for `fcClose`, then
+  `TellFiler(&err, docClosd, docPutBack, window)` and forget the document.
+- "Save & Continue" and "Revert to Previous Version" are the tool's own (keep
+  the saved version separate from the working state).
+- Name the document in Set Aside: `GetFldrTitle(window, title)`, then `SetItem`.
+
+## Window controls (`lisa/scrollbars.h`)
+
+Office System windows draw their own scroll bars and size control, only while
+active:
+
+```c
+InitWmlSb(); InitSbList(&list, theHeap);                    /* once */
+hsbV = SbCreate(&list, hsbNil, tyvhV, pt00, 100);  hsbH = ... tyvhH ...
+SetPort(win); FlushRects(&rH, &rV); SetSbRect(hsbH, &rH); SetSbRect(hsbV, &rV);
+SetSbIcons(h, sbAllIcons);  /* 0 = gray only: everything is visible */
+SetThumb(h, pos * 1000 / range);
+activate:   PaintSbar(hsbH); PaintSbar(hsbV); PaintGrow();
+deactivate: HideSBorder(&win->portRect);
+buttonDown: if (FGrowHit(pt)) { DragFrame(pt, true, &br); FolderSize(win, br.h, br.v, true); }
+            else if (FSbHit(&list, pt, &hsb, &icon)) ...
+              arrows: PaintArw(hsb, icon, true); scroll while StillDown(); PaintArw(..., false)
+              gray (iconPagA/B): a page at a time while StillDown()
+              iconThumb: DragThumb(hsb, pt, &c); SetThumb(hsb, c); jump to c
+```
+
+Track the mouse after a `buttonDown` with `while (StillDown()) GetMouse(&pt);`
+(local coordinates of the current port). `Time()` counts hundredths of a second.
+
+## Office System conventions
+
+- File/Print first: Set Aside Everything, Set Aside "<doc>", Save & Put Away,
+  Save & Continue, Revert to Previous Version, Format for Printer..., Print...,
+  Monitor the Printer.... No New, Open, Save As, Close or Quit.
+- Edit: Undo Last Change, Cut/X, Copy/C, Paste/V, Clear, Select All of Document/A.
+- Dim commands that would do nothing (`DisableItem`); write mutually exclusive
+  choices as two items with the one in effect dimmed, or check marks.
+- Alerts in the phrase file, full sentences, two spaces after a period;
+  irreversible actions end "Once you click OK, you will not be able to change
+  your mind, even with Undo." `CautionAlert` returns true for OK.
+- Pixels are about 1.5 times taller than wide (90 x 60 dpi): a circle is 3
+  pixels wide for every 2 tall; draw icons and cursors for that.
 
 ## Phrase file (`<name>.phrase`, compiled by `tools/phrasec.py`)
 

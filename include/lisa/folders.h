@@ -18,6 +18,9 @@ pascal void GetWindInfo(WindowPtr window, WindowInfo *info) LISA_IU(GETWINDI);
 pascal void BeginUpdate(WindowPtr folder) LISA_IU(BEGINUPD);
 pascal void EndUpdate(WindowPtr folder) LISA_IU(ENDUPDAT);
 pascal void ValidRect(const Rect *goodRect) LISA_IU(VALIDREC);
+pascal void InvalRect(const Rect *badRect) LISA_IU(INVALREC);      /* local to the current port */
+pascal void InvalRgn(RgnHandle badRgn) LISA_IU(INVALRGN);
+pascal void GetFldrTitle(WindowPtr folder, unsigned char *title) LISA_IU(GETFLDRT);  /* Str255 */
 /* Standard activate/deactivate protocol for folderActivate/Deactivate events. */
 pascal void TakeControl(const EventRecord *event, Boolean keepMenus, Boolean keepDialog) LISA_IU(TAKECONT);
 pascal void GiveControl(const EventRecord *event) LISA_IU(GIVECONT);

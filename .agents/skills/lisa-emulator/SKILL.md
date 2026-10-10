@@ -61,7 +61,10 @@ Run: `gs-headless --speed=turbo rom=<rom> model=lisa script=<file>`.
 - Insert floppies after boot: a fresh Lisa may try to start from the floppy,
   and lisa-c floppies are not bootable.
 - Icon and button positions on a freshly repaired single-tool diskette are
-  fixed (see `run-los-tool.sh`); a different number of files moves icons.
+  fixed (see `run-los-tool.sh`): the stationery pad at (70, 58), the tool icon
+  at (191, 58), a torn-off document at (36, 55); a set-aside document goes to
+  the bottom left of the desktop (58, 338). Opening the tool icon starts the
+  tool without a document (fcNone), in a smaller window than a document's.
 
 ## Tests
 

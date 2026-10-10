@@ -15,9 +15,9 @@ Two kinds of program:
 
 | Path | What |
 |---|---|
-| `examples/<name>/` | Programs: `<name>.c`, and for a desktop tool `<name>.phrase` (menus, alerts) |
+| `examples/<name>/` | Programs: every `.c` in the directory, and for a desktop tool `<name>.phrase` (menus, alerts). An app elsewhere passes `SRCDIR=/path` |
 | `tests/<name>/` | Workshop test programs (`input.txt` = typed input) |
-| `include/lisa/` | C headers for the Lisa libraries (QuickDraw, windows, menus, alerts, Filer, …) |
+| `include/lisa/` | C headers for the Lisa libraries (QuickDraw, windows, menus, alerts, Filer, scroll bars and size control, …) |
 | `runtime/` | Startup code, PASLIB console glue, POSIX layer for picolibc |
 | `tools/` | The pipeline: `lisalink.py` (link), `elf2lisa.py` (Lisa object format), `phrasec.py` (phrase files), `mklisafs.py` (floppy file system), generators for library thunks and OS-call stubs |
 | `emu/` | Emulator scripts (`env.sh` = settings; see the `lisa-emulator` skill) |

@@ -10,7 +10,9 @@
 # and opens it, which starts the tool with Make_Process.
 #
 # Icon positions are those of a freshly repaired single-tool diskette (the
-# emulator is deterministic).  Screenshots: <out-dir>/{1-inserted,2-repaired,
+# emulator is deterministic): the pad at (70, 58), the tool icon at (191, 58)
+# (opening that would start the tool without a document: fcNone), and the
+# torn-off document "<name> Paper <date>" at (36, 55).  Screenshots: <out-dir>/{1-inserted,2-repaired,
 # 3-diskette,4-torn-off,5-opened,6-later}.png (default build/emu-tool/).
 # CLOSE=1 then chooses the tool's File/Print > "Set Aside" item (menu 1,
 # item 2) and saves 7-menu.png and 8-closed.png.  SAVE=file.dc42 finally saves
@@ -57,11 +59,11 @@ machine.screen.save "$OUT/2-repaired.png"
 dclick(181, 336)
 scheduler.run 40000000
 machine.screen.save "$OUT/3-diskette.png"
-dclick(191, 58)
+dclick(70, 58)
 scheduler.run 60000000
 machine.screen.save "$OUT/4-torn-off.png"
 scheduler.run 10000000
-dclick(155, 54)
+dclick(36, 55)
 scheduler.run 60000000
 machine.screen.save "$OUT/5-opened.png"
 scheduler.run $LATER

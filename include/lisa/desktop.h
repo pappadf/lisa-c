@@ -9,4 +9,5 @@
 #include "lisa/filer.h"
 #include "lisa/storage.h"
 #include "lisa/cursors.h"
+#include "lisa/scrollbars.h"
 #endif

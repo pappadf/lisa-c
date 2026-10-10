@@ -24,8 +24,12 @@ SYSROOT := build/sysroot/lib
 LIBGCC  := $(shell $(CC) -m68000 -print-libgcc-file-name 2>/dev/null)
 LIBS     = build/lib/liblisa.a build/lib/liblisaiu.a $(SYSROOT)/libc.a $(SYSROOT)/libm.a $(LIBGCC)
 
+# A program is every .c file in SRCDIR (default examples/PROG or tests/PROG;
+# an app kept elsewhere passes SRCDIR=/path/to/its/sources).
 PROG    ?= hello
 SRCDIR   = $(firstword $(wildcard examples/$(PROG) tests/$(PROG)))
+SRCS     = $(if $(SRCDIR),$(wildcard $(SRCDIR)/*.c))
+OBJS     = $(patsubst $(SRCDIR)/%.c,build/$(PROG)/%.o,$(SRCS))
 TESTS   := $(notdir $(patsubst %/,%,$(wildcard tests/*/)))
 
 # Data derived from Apple's software, kept outside this repository:
@@ -38,6 +42,7 @@ ENTRIES ?= $(PRIVATE)/data/entries.tsv
 EXPECT  ?= $(PRIVATE)/tests
 TOOL_TESTS := $(notdir $(patsubst %/,%,$(wildcard $(EXPECT)/tools/*/)))
 
+HEADERS := $(wildcard include/lisa/*.h)
 RT_OBJS := build/rt/paslib.o build/rt/lisa.o build/rt/lisa_os.o build/rt/mem.o build/rt/posix.o
 
 all: build/$(PROG).obj
@@ -58,7 +63,6 @@ build/include/lisa/traps.h: $(ENTRIES) tools/gen_traps.py
 	python3 -I tools/gen_traps.py $< $@
 
 # Register-saving thunks for the library routines declared in include/lisa
-HEADERS := $(wildcard include/lisa/*.h)
 build/iu/.stamp: $(HEADERS) $(ENTRIES) tools/gen_iu_thunks.py
 	rm -rf build/iu && python3 -I tools/gen_iu_thunks.py $(ENTRIES) build/iu $(filter-out include/lisa/traps.h,$(HEADERS))
 	touch $@
@@ -80,11 +84,14 @@ build/rt/lisa_os.o: build/rt/lisa_os.S
 build/lib/liblisa.a: $(RT_OBJS) | build/lib
 	rm -f $@ && $(AR) rcs $@ $^
 
-build/$(PROG).o: $(SRCDIR)/$(PROG).c runtime/lisa.h build/include/lisa_os.h build/include/lisa/traps.h $(SYSROOT)/libc.a | build
-	$(CC) $(CFLAGS) -c $< -o $@
+build/$(PROG)/%.o: $(SRCDIR)/%.c $(wildcard $(SRCDIR)/*.h) runtime/lisa.h build/include/lisa_os.h \
+                   build/include/lisa/traps.h $(SYSROOT)/libc.a $(HEADERS)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -I$(SRCDIR) -c $< -o $@
 
-build/$(PROG).elf: build/rt/crt0.o build/$(PROG).o $(LIBS) tools/lisalink.py
-	LISA_CROSS=$(CROSS) python3 -I tools/lisalink.py $@ build/rt/crt0.o build/$(PROG).o \
+build/$(PROG).elf: build/rt/crt0.o $(OBJS) $(LIBS) tools/lisalink.py
+	@[ -n "$(OBJS)" ] || { echo "no sources for PROG=$(PROG) (SRCDIR=$(SRCDIR))" >&2; exit 1; }
+	LISA_CROSS=$(CROSS) python3 -I tools/lisalink.py $@ build/rt/crt0.o $(OBJS) \
 	    -Wl,--start-group $(LIBS) -Wl,--end-group
 
 build/$(PROG).obj: build/$(PROG).elf tools/elf2lisa.py
