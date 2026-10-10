@@ -3,7 +3,8 @@
 #
 #   tools/package_toolchain.sh PREFIX OUT
 #
-# PREFIX is a Retro68 install (build-toolchain.bash --no-ppc --no-carbon);
+# PREFIX is an install from tools/build_toolchain.sh (or a full Retro68 one,
+# build-toolchain.bash --no-ppc --no-carbon);
 # OUT/ receives: the C compiler driver, cc1 and collect2, binutils (ld is the
 # plain ELF linker, not Retro68's Elf2Mac wrapper), libgcc for every 68k
 # multilib and GCC's own headers.  Left out: C++, LTO, the Mac headers and
@@ -31,8 +32,8 @@ for b in ar as nm objcopy objdump ranlib readelf strip ld.real; do
 done
 ln -s ld.real "$OUT/$T/bin/ld"
 ln -s "../$T/bin/ld.real" "$OUT/bin/$T-ld"
-for f in cc1 collect2 lto-wrapper liblto_plugin.so; do
-    cp -L "$PREFIX/libexec/gcc/$T/$V/$f" "$OUT/libexec/gcc/$T/$V/"
+for f in cc1 collect2 lto-wrapper liblto_plugin.so; do     # the last two are optional
+    [ -e "$PREFIX/libexec/gcc/$T/$V/$f" ] && cp -L "$PREFIX/libexec/gcc/$T/$V/$f" "$OUT/libexec/gcc/$T/$V/"
 done
 cp -a "$PREFIX/lib/gcc/$T/$V" "$OUT/lib/gcc/$T/"
 rm -rf "$OUT/lib/gcc/$T/$V/plugin"

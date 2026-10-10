@@ -2,7 +2,7 @@
 
 C programs are built on the host into Lisa executable object files and written to a 400K LOS floppy image. They run in granny-smith either as **Office System desktop tools** (windows, menus, QuickDraw) or as Workshop console programs. Nothing is compiled or linked on the Lisa. Programs get a standard C library (picolibc), writable globals, a heap, console and file I/O, and C headers for QuickDraw, windows, events, menus, alerts and the Filer protocol.
 
-The compiler is **Retro68's GCC** (68000 target). Its `pascal` attribute provides the Lisa Pascal calling convention. `make toolchain` downloads a prebuilt, trimmed copy (about 70 MB) into `toolchain/retro68`; `.github/workflows/toolchain.yml` builds it from a pinned Retro68 commit and publishes it as a release.
+The compiler is **Retro68's GCC** (68000 target). Its `pascal` attribute provides the Lisa Pascal calling convention. `make toolchain` downloads a prebuilt, trimmed copy (about 70 MB) into `toolchain/retro68`; `.github/workflows/toolchain.yml` builds it from a pinned Retro68 commit and publishes it as a release (push a `toolchain-*` tag). To build it yourself: `tools/build_toolchain.sh <Retro68 checkout> <build dir> <prefix>` (binutils and a C-only GCC with libgcc, about 25 minutes on 2 cores), then `tools/package_toolchain.sh <prefix> toolchain/retro68`.
 
 ```
 make                  # build/hello.obj  (Lisa executable)

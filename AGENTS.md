@@ -44,7 +44,8 @@ make toolchain                 # download the prebuilt compiler (once)
 
 - The compiler: Retro68's GCC for m68k. `make toolchain` downloads the prebuilt
   one (a release of this repo, built by `.github/workflows/toolchain.yml`) into
-  `toolchain/retro68`; or set `CROSS` to another install's
+  `toolchain/retro68` (`tools/build_toolchain.sh` + `tools/package_toolchain.sh`
+  build the same thing from source); or set `CROSS` to another install's
   `.../bin/m68k-apple-macos-`. It is the only compiler: picolibc, the runtime
   and programs must all be built with it, because its C calling convention
   differs from other m68k GCCs.
