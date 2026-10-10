@@ -1,0 +1,87 @@
+---
+name: lisa-emulator
+description: >
+  Run and test lisa-c programs in the granny-smith emulator (gs-headless):
+  set up the emulator and the user's Lisa ROM and disk images, run Workshop
+  programs and desktop tools, take and compare screenshots, type input, script
+  mouse clicks, save the floppy the Lisa wrote, and debug crashes with
+  logpoints.
+---
+# Running Lisa programs in granny-smith
+
+## Setup (`emu/env.sh`)
+
+- **Emulator:** `gs-headless` from `$GS_HEADLESS`, `build/gs/gs-headless`, the
+  `PATH`, or `../granny-smith/build/headless/gs-headless`. Granny-smith releases
+  carry static Linux binaries (`granny-smith-headless-<tag>-linux-<arch>.tar.gz`).
+- **Apple software, supplied by the user** (never commit it):
+  `media/lisa.rom` (Lisa 2 boot ROM, rev H), `media/los31.image` (Office
+  System 3.1 installed on a ProFile), `media/workshop.image` (Workshop 3.0 on a
+  ProFile). Override with `LISA_ROM`, `LOS_IMAGE`, `WORKSHOP_IMAGE`.
+
+## Scripts
+
+| Script | Does | Screenshots |
+|---|---|---|
+| `emu/run-workshop.sh floppy prog [out]` | boots the Workshop, inserts the floppy, types `r`, `-lisac-<prog>`, Return; `INPUT='text\n'` types into the program; `RUN_INSTR=N` runs longer | `shell.png`, `run.png` |
+| `emu/run-los-tool.sh floppy [out]` | boots LOS, inserts the floppy, clicks Repair, opens the diskette, tears off and opens a document; `CLOSE=1` then chooses File/Print > Set Aside; `LATER=N` runs N instructions after opening; `SAVE=file.dc42` saves the floppy as the Lisa left it | `1-inserted` ... `6-later`, `7-menu`, `8-closed` |
+| `emu/boot-los.sh [floppy] [out]` | boots LOS (and inserts a floppy) | `desktop.png`, `floppy.png` |
+
+Each writes its emulator script (`*.script`) and log (`*.log`) into the output
+directory: start from those to write a new scenario. Screenshots are 720x364
+PNGs; view them to see what happened.
+
+`make PROG=x run` and `make test` use these scripts.
+
+## Writing a scenario
+
+Scripts are plain granny-smith shell commands:
+
+```
+machine.boot model="lisa" ram=2048 rom="media/lisa.rom"
+machine.hd.attach "build/emu-x/profile.image"        # a scratch copy
+assert machine.hd.pram_init(2, false) "pram_init failed"   # boot from the ProFile
+scheduler.run 60000000                               # ~ boot to the desktop
+machine.floppy.drive.0.insert "build/x-tool.dc42"
+machine.adb.mouse.move 597 216 "global"
+machine.adb.mouse.click true
+scheduler.run 80000
+machine.adb.mouse.click false
+machine.adb.keyboard.type("text")                    # at most ~12 characters per call
+machine.screen.save "build/emu-x/shot.png"
+machine.floppy.drive.0.save "build/emu-x/after.dc42" # the floppy, with the Lisa's writes
+quit
+```
+
+Run: `gs-headless --speed=turbo rom=<rom> model=lisa script=<file>`.
+
+- Runs are deterministic: the same script gives byte-identical screenshots.
+- Writes to disk images stay in a delta, not in the source file; use
+  `machine.floppy.drive.0.save` (or `machine.hd.save`) to get them out.
+- Insert floppies after boot: a fresh Lisa may try to start from the floppy,
+  and lisa-c floppies are not bootable.
+- Icon and button positions on a freshly repaired single-tool diskette are
+  fixed (see `run-los-tool.sh`); a different number of files moves icons.
+
+## Tests
+
+`make test` builds each test, runs it and compares the final screenshot(s)
+byte for byte with `$(EXPECT)` (`<test>/expected.png`,
+`tools/<tool>/{opened,closed}.png`). When a change alters the screen on
+purpose, look at the new screenshot, then copy it over the reference.
+
+## Debugging
+
+- **Tool crash:** declare the `SYS_TERMINATE` handler (see `lisa-desktop-tool`)
+  and log its data: first long = kind (21 = bus error), then the fault
+  address, instruction and PC.
+- **Logpoints:** `debug.logpoints.add addr=0x... message="d0=${machine.cpu.d0}"`
+  before the run. Code reached through the library jump vectors (IUJSR) runs
+  with `$A0` in the top byte of the PC, so library routines need
+  `$A0xxxxxx` addresses.
+- **Memory:** `machine.memory.peek.l <addr>`; the program's data segment is at
+  `$D60000`, the heap at `$E00000`.
+- **Which library routine is at a PC:** look the address up in the entry
+  table (`ENTRIES`: link name -> jump-vector address).
+- Interactive debugging: `gs-headless --daemon` opens a TCP shell on port
+  6800 (see granny-smith's `headless-debug` skill).

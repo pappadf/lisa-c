@@ -1,0 +1,120 @@
+# Build the C compiler (Retro68's GCC for m68k) and publish it as a release,
+# so nobody using lisa-c has to build it.  `make toolchain` downloads it.
+#
+# Run it from the Actions tab (workflow_dispatch) with a new release tag.  It
+# builds Retro68 at RETRO68_COMMIT on Linux x86_64 and arm64, trims the
+# install to what lisa-c uses (tools/package_toolchain.sh: ~70 MB instead of
+# ~1.8 GB, relocatable, GMP/MPFR/MPC/zstd bundled) and attaches
+#   lisa-c-toolchain-<tag>-linux-<arch>.tar.xz
+# to the release <tag>.  Ubuntu 22.04 runners: the binaries need glibc 2.35+.
+#
+# Only runs in pappadf/lisa-c, not in repositories made from the template.
+
+name: Toolchain
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to create (e.g. toolchain-v1); `make toolchain` uses TOOLCHAIN_TAG
+        required: true
+        default: toolchain-v1
+
+env:
+  RETRO68_REPO: https://github.com/autc04/Retro68.git
+  RETRO68_COMMIT: d8b891a6028342fdb8c18750c3a13473ab974d82
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.repository == 'pappadf/lisa-c'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: lisa-c
+          persist-credentials: false
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential cmake ninja-build bison flex texinfo ruby \
+            libgmp-dev libmpfr-dev libmpc-dev libzstd-dev zlib1g-dev libboost-all-dev patchelf xz-utils
+
+      - name: Fetch Retro68
+        run: |
+          git init -q Retro68
+          git -C Retro68 remote add origin "$RETRO68_REPO"
+          git -C Retro68 fetch -q --depth 1 origin "$RETRO68_COMMIT"
+          git -C Retro68 checkout -q FETCH_HEAD
+          git -C Retro68 submodule update -q --init --depth 1
+
+      - name: Build Retro68 (m68k only)
+        run: |
+          mkdir build && cd build
+          ../Retro68/build-toolchain.bash --no-ppc --no-carbon --prefix="$PWD/../install" \
+            > ../build.log 2>&1 || { tail -100 ../build.log; exit 1; }
+          tail -5 ../build.log
+
+      - name: Package
+        run: |
+          TAG="${{ inputs.tag }}"
+          NAME="lisa-c-toolchain-$TAG-linux-${{ matrix.arch }}"
+          lisa-c/tools/package_toolchain.sh install "out/retro68"
+          cat > out/retro68/SOURCE.txt <<SRC
+          Retro68 (GPL; see its repository for the licences of GCC, binutils
+          and the other components), built from:
+            $RETRO68_REPO
+            commit $RETRO68_COMMIT
+          with: build-toolchain.bash --no-ppc --no-carbon
+          then trimmed by lisa-c's tools/package_toolchain.sh.
+          Built by https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SRC
+          out/retro68/bin/m68k-apple-macos-gcc --version | head -1
+          tar -C out -cJf "$NAME.tar.xz" retro68
+          ls -la "$NAME.tar.xz"
+
+      - name: Smoke test (compile and link for the 68000)
+        run: |
+          printf 'int f(long a, long b) { return a / b + (a * b); }\n' > t.c
+          out/retro68/bin/m68k-apple-macos-gcc -m68000 -O2 -c t.c -o t.o
+          out/retro68/bin/m68k-apple-macos-gcc -m68000 -nostdlib -Wl,-e,f t.o -lgcc -o t.elf
+          out/retro68/m68k-apple-macos/bin/objdump -d t.elf | head -20
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: toolchain-${{ matrix.arch }}
+          path: lisa-c-toolchain-*.tar.xz
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: toolchain-*
+          merge-multiple: true
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ inputs.tag }}"
+          gh release create "$TAG" lisa-c-toolchain-*.tar.xz \
+            --repo "${{ github.repository }}" --target "${{ github.sha }}" \
+            --title "Toolchain $TAG" \
+            --notes "Retro68 GCC for m68k (68000), built from autc04/Retro68@${RETRO68_COMMIT} and trimmed for lisa-c. Install with \`make toolchain TOOLCHAIN_TAG=$TAG\`. Linux x86_64 and arm64, glibc 2.35 or newer."

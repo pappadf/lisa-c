@@ -1,0 +1,9 @@
+# Build output (compiler output, picolibc, floppies, emulator runs)
+build/
+toolchain/
+__pycache__/
+*.pyc
+
+# Your own copies of Apple software (Lisa ROM, LOS images) for the emulator:
+# never commit them
+media/

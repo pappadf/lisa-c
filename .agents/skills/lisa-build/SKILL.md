@@ -1,0 +1,85 @@
+---
+name: lisa-build
+description: >
+  Build C programs for the Apple Lisa with lisa-c: add a new program, build a
+  Workshop program or a desktop-tool floppy, understand the pipeline (Retro68
+  GCC -> lisalink -> elf2lisa -> mklisafs), what C library features exist,
+  the memory layout and the current limitations.
+---
+# Building Lisa programs with lisa-c
+
+## Add a program
+
+1. Create `examples/<name>/<name>.c`. (The Makefile looks in `examples/<name>/`
+   first, then `tests/<name>/`.)
+2. Workshop (console) program: an ordinary `int main(void)` using stdio.
+   Build with `make PROG=<name>`; `make PROG=<name> run` runs it and saves
+   `build/emu-<name>/run.png`.
+3. Desktop tool: also write `examples/<name>/<name>.phrase` and follow the
+   `lisa-desktop-tool` skill. Build with `make PROG=<name> tool`; the floppy is
+   `build/<name>-tool.dc42`. Set the desktop name with `TOOLNAME=...` (default:
+   the program name) and the tool number with `TOOLNUM=` (default 20; use
+   numbers above 16, which the Office System does not know).
+4. To make it a regression test, put a Workshop program in `tests/<name>/`
+   (optionally `input.txt`) and add its reference screenshot as
+   `$(EXPECT)/<name>/expected.png`.
+
+## What the C environment offers
+
+- picolibc: stdio (console through PASLIB: `printf`, `fgets`, `getchar`),
+  `malloc`/`free`, string and math functions, `time`/`gettimeofday`,
+  `nanosleep`.
+- Files: `fopen`/`open`/`read`/`write`/`lseek`/`stat`/`unlink` map to Lisa OS
+  calls (no `rename`). Lisa paths look like `-volume-name` (e.g. `-lisac-data.txt`);
+  a bare name is relative to the working directory.
+- Lisa OS calls directly: `#include "lisa_os.h"` (generated; `lisa_open`,
+  `lisa_make_dataseg`, `lisa_info_process`, `lisa_delay_time`, ...). Each takes
+  `int16_t *ecode` first; Pascal strings (length byte first) for paths.
+- Lisa libraries (QuickDraw, windows, menus, alerts, Filer, ...):
+  `#include "lisa/desktop.h"` (or a single `lisa/*.h`). These are `pascal`
+  functions: strings are Pascal strings (`unsigned char s[]`, `s[0]` = length),
+  `VAR` parameters are pointers, `Point`/`Rect` as in QuickDraw.
+- Multiple code segments are made automatically (up to 16 x 32 KB).
+
+## Pipeline (what `make` runs)
+
+1. Retro68 GCC (`-m68000`, A5 reserved) compiles C and the runtime.
+2. `tools/lisalink.py` links twice with `ld.real`, packing functions into
+   segments of at most 32 KB and placing data in a data segment.
+3. `tools/elf2lisa.py` writes the Lisa Workshop 3.0 object format (code
+   segments, jump table for calls between segments, unit/segment tables;
+   `--tool` adds the desktop-tool tables). `tools/objdump_lisa.py` dumps it.
+4. `tools/phrasec.py` compiles the phrase file (tools only).
+5. `tools/mklisafs.py` writes a 400K Office System 3.1 floppy (volume LisaC,
+   no boot tracks: a data disk).
+
+Generated at build time: `build/include/lisa_os.h` + OS-call stubs
+(`tools/gen_syscalls.py`), `build/include/lisa/traps.h` and the library thunks
+`build/lib/liblisaiu.a` (`tools/gen_traps.py`, `tools/gen_iu_thunks.py`, from
+the entry table `ENTRIES`).
+
+## Memory layout
+
+| What | Where |
+|---|---|
+| Code | segments at `$20000`, `$40000`, ... (code at +8) |
+| `.data`/`.rodata`/`.bss` | data segment at `$D60000` (LDSN 1) |
+| Heap | data segment at `$E00000` (LDSN 6), grown 32 KB at a time, up to 1.4 MB |
+| Stack | the Lisa's stack segment; the jump table sits at its top (`$F80000`) |
+
+## Limitations
+
+- The initial `.data` + `.rodata` image must fit in the first segment next to
+  the startup code; `.data` + `.rodata` + `.bss` must fit in 640 KB.
+- No stack probes: avoid very large stack frames (several KB).
+- No compressed (packed) code segments.
+- Floppies are 400K data disks only (not bootable).
+
+## Troubleshooting
+
+- `ENTRIES ... is missing`: make the entry table with `tools/gen_entries.py`
+  from the Workshop 3.0 library files (`IOSPASLIB.OBJ`, `SYS1LIB.OBJ`, ...).
+- Link errors about a library routine: declare it in `include/lisa/*.h` with
+  `LISA_IU(LINKNAME)` (the link name is in the entry table).
+- Never link objects from another m68k compiler (D2 and `short` arguments are
+  handled differently).
