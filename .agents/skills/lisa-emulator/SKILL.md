@@ -24,6 +24,7 @@ description: >
 | Script | Does | Screenshots |
 |---|---|---|
 | `emu/run-workshop.sh floppy prog [out]` | boots the Workshop, inserts the floppy, types `r`, `-lisac-<prog>`, Return; `INPUT='text\n'` types into the program; `RUN_INSTR=N` runs longer | `shell.png`, `run.png` |
+| `emu/serve.sh floppy [port]` (`make PROG=x serve`) | interactive: serves granny-smith's web build (release `GS_VERSION`, downloaded into `build/gs-web/`; or `GS_WEB=dir`) with the floppy on one local origin; opening `/` boots a Lisa 2 with LOS 3.1 from the ProFile and the floppy in the drive. ROM and ProFile: `media/` if present, else archive.org copies (`MEDIA=archive` forces those). In a Codespace it prints the forwarded address | (a browser) |
 | `emu/run-los-tool.sh floppy [out]` | boots LOS, inserts the floppy, clicks Repair, opens the diskette, tears off and opens a document; `CLOSE=1` then chooses File/Print > Set Aside; `LATER=N` runs N instructions after opening; `SAVE=file.dc42` saves the floppy as the Lisa left it | `1-inserted` ... `6-later`, `7-menu`, `8-closed` |
 | `emu/boot-los.sh [floppy] [out]` | boots LOS (and inserts a floppy) | `desktop.png`, `floppy.png` |
 
@@ -49,7 +50,7 @@ scheduler.run 80000
 machine.adb.mouse.click false
 machine.adb.keyboard.type("text")                    # at most ~12 characters per call
 machine.screen.save "build/emu-x/shot.png"
-machine.floppy.drive.0.save "build/emu-x/after.dc42" # the floppy, with the Lisa's writes
+machine.floppy.drive.0.export "build/emu-x/after.dc42" # the floppy, with the Lisa's writes
 quit
 ```
 
@@ -57,7 +58,7 @@ Run: `gs-headless --speed=turbo rom=<rom> model=lisa script=<file>`.
 
 - Runs are deterministic: the same script gives byte-identical screenshots.
 - Writes to disk images stay in a delta, not in the source file; use
-  `machine.floppy.drive.0.save` (or `machine.hd.save`) to get them out.
+  `machine.floppy.drive.0.export` (or `machine.hd.save`) to get them out.
 - Insert floppies after boot: a fresh Lisa may try to start from the floppy,
   and lisa-c floppies are not bootable.
 - Icon and button positions on a freshly repaired single-tool diskette are

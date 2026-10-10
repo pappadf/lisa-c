@@ -7,6 +7,7 @@
 #   make test             run every test (Workshop programs and desktop tools)
 #   make test-<name>      run one test
 #   make toolchain        download the prebuilt compiler into toolchain/retro68
+#   make PROG=x serve     build desktop tool x and run it in the browser (emu/serve.sh)
 
 # Retro68 GCC (m68k-apple-macos): its `pascal` attribute is what the Lisa
 # headers and OS-call stubs rely on.  Everything -- runtime, picolibc,
@@ -136,6 +137,11 @@ tool: build/$(PROG).phrase
 	cp build/$(PROG).phrase 'build/tool-$(PROG)/{T$(TOOLNUM)}PHRASE'
 	tools/mkdisk.sh -t '$(TOOLNAME)' build/$(PROG)-tool.dc42 build/tool-$(PROG)/*
 
+# make PROG=hellotool serve     -> build the tool's floppy and run it interactively in
+#                                 granny-smith's web build (emu/serve.sh prints the link)
+serve: tool
+	emu/serve.sh build/$(PROG)-tool.dc42
+
 test-tool-%:
 	@$(MAKE) --no-print-directory PROG=$* tool >/dev/null
 	@CLOSE=1 LATER=200000000 emu/run-los-tool.sh build/$*-tool.dc42 build/emu-tool-$* >/dev/null
@@ -158,6 +164,6 @@ toolchain:
 clean:
 	rm -rf build
 
-.PHONY: all disk run test clean tool toolchain
+.PHONY: all disk run test clean tool toolchain serve
 .SECONDARY:
 .DELETE_ON_ERROR:

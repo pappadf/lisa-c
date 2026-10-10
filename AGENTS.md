@@ -36,6 +36,7 @@ make PROG=<name> tool          # desktop tool floppy -> build/<name>-tool.dc42
 make test                      # all tests; PASS/FAIL/SKIP per test
 make test-<name>               # one Workshop test
 make test-tool-<name>          # one desktop-tool test (install, open, Set Aside on LOS)
+make PROG=<name> serve         # run a desktop tool interactively in the browser (emu/serve.sh)
 make clean
 make toolchain                 # download the prebuilt compiler (once)
 ```

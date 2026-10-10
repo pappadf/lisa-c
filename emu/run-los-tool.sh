@@ -16,7 +16,7 @@
 # 3-diskette,4-torn-off,5-opened,6-later}.png (default build/emu-tool/).
 # CLOSE=1 then chooses the tool's File/Print > "Set Aside" item (menu 1,
 # item 2) and saves 7-menu.png and 8-closed.png.  SAVE=file.dc42 finally saves
-# the diskette as the Lisa left it (granny-smith's machine.floppy.drive.0.save).
+# the diskette as the Lisa left it (granny-smith's machine.floppy.drive.0.export).
 # Emulator, ROM and LOS image: see emu/env.sh.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
@@ -84,7 +84,7 @@ machine.screen.save "$OUT/8-closed.png"
 EOF
 fi
 if [ -n "${SAVE:-}" ]; then
-  echo "machine.floppy.drive.0.save \"$(realpath -m "$SAVE")\"" >> "$OUT/tool.script"
+  echo "machine.floppy.drive.0.export \"$(realpath -m "$SAVE")\"" >> "$OUT/tool.script"
 fi
 echo quit >> "$OUT/tool.script"
 

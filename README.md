@@ -14,6 +14,8 @@ make test             # every test: Workshop programs (tests/<name>) and desktop
 make test-<name>      # one test
 make PROG=hellotool tool     # desktop tool: build/hellotool-tool.dc42 ({T20}obj + {T20}PHRASE)
 make test-tool-hellotool     # install it on the LOS desktop, open a document, Set Aside
+make PROG=hellotool serve    # run it interactively: granny-smith in the browser, LOS 3.1 booted
+                             # with the floppy in the drive (prints the address to open)
 ```
 
 - `make run` puts its screenshot in `build/emu-<prog>/run.png`.
