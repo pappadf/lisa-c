@@ -143,6 +143,10 @@ There is no intention to track, at the file or commit level, which code was
 written with AI assistance and which wasn't. I know that AI may be a red flag
 for some people, and I fully respect that.
 
+## Trademarks
+
+All trademarks referenced in this project are the property of their respective owners and are used for identification purposes only. This project does not claim any endorsement by or affiliation with the trademark holders.
+
 ## License
 
 MIT; see `LICENSE`.
