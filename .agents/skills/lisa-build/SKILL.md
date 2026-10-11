@@ -22,8 +22,9 @@ description: >
 3. Desktop tool: also write `examples/<name>/<name>.phrase` and follow the
    `lisa-desktop-tool` skill. Build with `make PROG=<name> tool`; the floppy is
    `build/<name>-tool.dc42`. Set the desktop name with `TOOLNAME=...` (default:
-   the program name) and the tool number with `TOOLNUM=` (default 20; use
-   numbers above 16, which the Office System does not know).
+   the program name), the floppy's name with `DISKNAME=` (default: the tool
+   name) and the tool number with `TOOLNUM=` (default 20; use numbers above
+   16, which the Office System does not know).
 4. To make it a regression test, put a Workshop program in `tests/<name>/`
    (optionally `input.txt`) and add its reference screenshot as
    `$(EXPECT)/<name>/expected.png`.
@@ -63,7 +64,11 @@ description: >
    `--tool` adds the desktop-tool tables). `tools/objdump_lisa.py` dumps it.
 4. `tools/phrasec.py` compiles the phrase file (tools only).
 5. `tools/mklisafs.py` writes a 400K Office System 3.1 floppy (volume LisaC,
-   no boot tracks: a data disk).
+   or `DISKNAME` for a tool; no boot tracks: a data disk) with the Desktop
+   Manager's catalog, so LOS mounts it without a Repair. `DISKARGS='--document
+   NAME TOOLNUM SUFFIX=FILE'` adds a ready-made document (a catalog record and
+   its file `{D<id>T<n>}SUFFIX`); `tools/lisadisk.py` reads a floppy back
+   (`files`, `desktop`, `extract`), e.g. one the Lisa wrote.
 
 Generated at build time: `build/include/lisa_os.h` + OS-call stubs
 (`tools/gen_syscalls.py`), `build/include/lisa/traps.h` and the library thunks

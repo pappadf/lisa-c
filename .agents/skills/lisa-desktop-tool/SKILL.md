@@ -18,12 +18,18 @@ LisaPaint, a separate project built with lisa-c (`SRCDIR=`, see lisa-build).
 Files named `{Tn}...` on a volume, n = tool number: `{Tn}obj` (the program,
 built with `TOOL=1`) and `{Tn}PHRASE` (menus and alerts). `make PROG=x tool`
 writes both to `build/x-tool.dc42`, plus a file label on `{Tn}obj` that names
-the tool (`TOOLNAME`). Use tool numbers above 16.
+the tool (`TOOLNAME`). Use tool numbers above 16. The floppy is named
+`DISKNAME` (default `TOOLNAME`) and holds the Desktop Manager's catalog
+(`{!CATALOG}`, written by `tools/mklisafs.py`), which registers the tool and
+its "<name> Paper" stationery pad, as LOS's Repair would.
 
-Installing: insert the floppy in LOS, choose **Repair** when it says the disk
-is not in the standard format. Repair registers the tool and adds its
-"<name> Paper" stationery. Tear off a document and open it: the Desktop
-Manager starts the tool (`Make_Process`). `emu/run-los-tool.sh` scripts this.
+Documents: the Desktop Manager names a document's diskfiles by the prefix
+`-<volume>-{D<id>T<n>}` (id = its catalog id); the tool appends its own
+suffixes. To ship a document on the floppy, pass `DISKARGS='--document NAME
+<n> SUFFIX=FILE'` to `make tool`.
+
+Installing: insert the floppy in LOS and open it (no Repair needed). Tear off
+a document and open it: the Desktop Manager starts the tool (`Make_Process`). `emu/run-los-tool.sh` scripts this.
 Opening the *tool* icon itself also starts it, but as `fcNone` with no
 document (no prefix): test with a torn-off document.
 

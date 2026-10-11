@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Make a 400K Lisa Office System (file system version 17) diskette image.
 
-    mklisafs.py [-n NAME] [-t TOOLNAME] [--date YYYY-MM-DD] out.dc42 [file...]
+    mklisafs.py [-n NAME] [-t TOOLNAME] [--date YYYY-MM-DD]
+                [--document NAME TOOL SUFFIX=FILE]... out.dc42 [file...]
 
 Writes a DiskCopy 4.2 image of an initialized, empty volume (default name
 "LisaC") holding the given host files, each under its basename.  The disk is
@@ -11,6 +12,18 @@ With -t, a tool program ({Tn}obj) gets a file label naming the tool, as the
 Desktop Manager reads it for tools it has no phrase string for (n > 16):
 version 2, name (string[63]), kind 24 (tool), tools-only and many-documents
 flags, window rectangle, split number, total size, parent id.
+
+The disk also gets the Desktop Manager's catalog ({!CATALOG} and its
+recovery copy {!CATALOG}$R), so the Office System mounts it as is instead
+of asking to Repair it.  It holds what Repair (RecoverCatalog) would make:
+the disk (named as the volume), the Wastebasket, the Clipboard, the Empty
+Folders pad, and for each tool ({Tn}obj) the tool and its "<name> Paper"
+stationery pad.
+
+--document adds a ready-made document for tool TOOL, named NAME on the
+desktop: a catalog record (id 101 and up, after the tools') and its files,
+{D<id>T<tool>}SUFFIX (the tool opens them by that prefix).  Repeat it with
+the same NAME and TOOL for more files of the document.
 
 Layout (page numbers are relative to the first file-system block, sector 28
 on a Sony diskette, as the Lisa's Sony driver configures it):
@@ -95,6 +108,10 @@ class Volume:
         self.next_page = start + n
         return start
 
+    def uid(self, sfile):
+        """The file's unique id (in its file header)."""
+        return hashlib.sha1(self.volid + struct.pack('>H', sfile)).digest()[:8]
+
     def add(self, name, contents, label=b''):
         sfile = FIRSTFILE + len(self.files)
         if sfile > MAXFILES:
@@ -109,7 +126,7 @@ class Volume:
             self.chain(first, npages, sfile, contents)
         h = bytearray(512)                        # hint page: file header (hentry)
         struct.pack_into('>B32s', h, 0, len(bname), bname)
-        h[0x22:0x2A] = hashlib.sha1(self.volid + struct.pack('>H', sfile)).digest()[:8]
+        h[0x22:0x2A] = self.uid(sfile)
         struct.pack_into('>HB', h, 0x2A, 21, 14)  # header version, ftype = userfile
         struct.pack_into('>LLL', h, 0x2E, self.when, self.when, self.when)   # DTC DTA DTM
         struct.pack_into('>hh', h, 0x6C, 0, 1)    # parentID = root, fsOverhead = 1 page
@@ -188,6 +205,79 @@ class Volume:
         return dc42(bytes(self.data), bytes(self.tags))
 
 
+# ---- the Desktop Manager's catalog ------------------------------------------
+# A database file (the Desktop Manager's TcatRec records, APDM-CAT): a header
+# page holding the record schema, then one 2048-byte leaf page.  Each record
+# is 56 bytes of fixed fields followed by the object's name, padded to even.
+CAT_NAME = '{!CATALOG}'
+CAT_PAGE = 2048
+NIL2, NIL4 = 0x8000, 0x80000000      # nullInt2, nullInt4
+ID_DISK, ID_TRASH, ID_SCRAP, ID_FOLDERPAD, ID_FIRST = 1, 2, 3, 7, 101
+K_DOC, K_PAD, K_TRASH, K_FOLDERPAD, K_SCRAP, K_TOOL, K_DISK = 4, 5, 6, 16, 17, 24, 25
+# (offset, type, size) of each TcatRec field: parentId, nameDesc, selfId,
+# objKind, objState, view, props, openRect, closedPt, created, modified,
+# objSize, split, unused2, toolId, extraDesc
+CAT_FIELDS = [(0, 3, 4), (4, 9, 4), (8, 6, 4), (12, 2, 2), (14, 1, 1), (15, 1, 1),
+              (16, 0, 2), (18, 0, 8), (26, 0, 4), (30, 3, 4), (34, 3, 4), (38, 3, 4),
+              (46, 2, 2), (48, 3, 4), (42, 3, 4), (52, 10, 4)]
+
+
+def cat_record(parent, ident, kind, name, rect=(40, 10, 290, 640), created=NIL4,
+               size=0, tool=NIL4):
+    name = name.encode('mac_roman')
+    r = struct.pack('>lHHlhBBH4hhhLLLLHLHH', parent, len(name), 56, ident, kind, 0x80, 0, 0,
+                    *rect, 0x7FFF, 0x7FFF, created, NIL4, size, tool, NIL2, NIL4,
+                    0, 56 + len(name)) + name
+    return r + b'\xff' * (len(r) & 1)
+
+
+def cat_header(uid, size, nrecs, root, next_id):
+    """The catalog file's header page: file size, record count, page size,
+    fixed record size, root page (-1: none), next free id, the file's unique
+    id, then the schema: (offset, type, size) for each field."""
+    h = bytearray(b'\xff' * 512)
+    struct.pack_into('>HHHHLLLHHHHHHHlLLHLLH8sH', h, 0, 0x9999, 0x0100, 1 if nrecs else 0, 0x31,
+                     512, size, nrecs, CAT_PAGE, 16, 3, 1, 56, 4, 1, root,
+                     0xFFFFFFFF, 0xFFFFFFFF, 0, 0, next_id, 2, uid, 0x9797)
+    for i, field in enumerate(CAT_FIELDS):
+        struct.pack_into('>HHH', h, 0x44 + 6 * i, *field)
+    return bytes(h)
+
+
+def desktop_catalog(vol, tools, docs, uid, uid_r):
+    """{!CATALOG} and {!CATALOG}$R for a volume with the given tools,
+    [(tool number, name, disk blocks of its files)], and documents,
+    [(id, name, tool number, disk blocks of its files)]."""
+    recs = [cat_record(0, ID_SCRAP, K_SCRAP, 'Clipboard', rect=(315, 10, 360, 640)),
+            cat_record(0, ID_DISK, K_DISK, vol.name.decode('mac_roman')),
+            cat_record(0, ID_TRASH, K_TRASH, 'Wastebasket'),
+            cat_record(ID_DISK, ID_FOLDERPAD, K_FOLDERPAD, 'Empty Folders', created=vol.when)]
+    ident = ID_FIRST
+    for num, name, blocks in tools:
+        recs.append(cat_record(ID_DISK, ident, K_TOOL, name, created=vol.when, size=blocks, tool=num))
+        recs.append(cat_record(ID_DISK, ident + 1, K_PAD, name + ' Paper', rect=(33, 2, 314, 716),
+                               created=vol.when, tool=num))
+        ident += 2
+    for ident, name, num, blocks in docs:
+        recs.append(cat_record(ID_DISK, ident, K_DOC, name, rect=(33, 2, 314, 716),
+                               created=vol.when, size=blocks, tool=num))
+        ident += 1
+    # ordered by parent, then name
+    recs.sort(key=lambda r: (r[:4], r[56:56 + r[5]].upper()))
+    page = bytearray(b'\xff' * CAT_PAGE)
+    pos = 0
+    for i, r in enumerate(recs):
+        struct.pack_into('>H', page, CAT_PAGE - 14 - 2 * i, pos)
+        page[pos:pos + len(r)] = r
+        pos += len(r)
+    struct.pack_into('>H', page, CAT_PAGE - 14 - 2 * len(recs), pos)
+    if pos > CAT_PAGE - 14 - 2 * len(recs):
+        raise SystemExit('too many tools and documents for the desktop catalog')
+    struct.pack_into('>HH', page, CAT_PAGE - 12, len(recs), 0x9999)
+    main = cat_header(uid, 512 + CAT_PAGE, len(recs), 512, ident) + bytes(page)
+    return main, cat_header(uid_r, 512, 0, -1, 1)
+
+
 def tool_label(name):
     """The Desktop Manager's file label for a tool."""
     b = name.encode('mac_roman')
@@ -216,18 +306,51 @@ def main():
     ap.add_argument('-n', '--name', default='LisaC', help='volume name (default LisaC)')
     ap.add_argument('-t', '--tool-name', help='name shown for the tool ({Tn}obj) on the desktop')
     ap.add_argument('--date', default='1984-01-24', help='creation date of the volume and files')
+    ap.add_argument('--document', nargs=3, action='append', default=[],
+                    metavar=('NAME', 'TOOL', 'SUFFIX=FILE'),
+                    help='a document of tool TOOL named NAME, file {D<id>T<tool>}SUFFIX')
     ap.add_argument('out')
     ap.add_argument('files', nargs='*')
     a = ap.parse_args()
     if '-' in a.name or len(a.name.encode('mac_roman')) > 32:
         sys.exit('bad volume name')
     vol = Volume(a.name, lisa_time(datetime.datetime.fromisoformat(a.date)))
+    tools = {}
     for f in a.files:
         name = os.path.basename(f)
         label = b''
-        if a.tool_name and re.fullmatch(r'\{T\d+\}obj', name, re.I):
-            label = tool_label(a.tool_name)
+        tool = re.fullmatch(r'\{T(\d+)\}obj', name, re.I)
+        if tool:
+            tools[int(tool[1])] = a.tool_name or ''
+            if a.tool_name:
+                label = tool_label(a.tool_name)
         vol.add(name, open(f, 'rb').read(), label)
+    docs = []
+    ident = ID_FIRST + 2 * len(tools)
+    grouped = {}
+    for name, tool, f in a.document:
+        if not tool.isdigit() or '=' not in f:
+            sys.exit('--document NAME TOOL SUFFIX=FILE')
+        if not 0 < len(name.encode('mac_roman')) <= 63:
+            sys.exit(f'bad document name: {name!r}')
+        grouped.setdefault((name, int(tool)), []).append(f.split('=', 1))
+    for (name, tool), parts in grouped.items():
+        nblocks = 0
+        for suffix, path in parts:
+            vol.add(f'{{D{ident}T{tool}}}{suffix}', open(path, 'rb').read())
+            nblocks += 1 + vol.files[-1][5]
+        docs.append((ident, name, tool, nblocks))
+        ident += 1
+    blocks = {}
+    for bname, sfile, hint, first, size, npages in vol.files:
+        tool = re.match(rb'\{T(\d+)\}', bname, re.I)
+        if tool:
+            blocks[int(tool[1])] = blocks.get(int(tool[1]), 0) + 1 + npages
+    sfile = FIRSTFILE + len(vol.files)
+    main, recovery = desktop_catalog(vol, [(n, tools[n], blocks[n]) for n in sorted(tools)], docs,
+                                     vol.uid(sfile + 1), vol.uid(sfile))
+    vol.add(CAT_NAME + '$R', recovery)
+    vol.add(CAT_NAME, main)
     open(a.out, 'wb').write(vol.image())
 
 

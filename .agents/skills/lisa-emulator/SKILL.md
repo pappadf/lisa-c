@@ -25,7 +25,7 @@ description: >
 |---|---|---|
 | `emu/run-workshop.sh floppy prog [out]` | boots the Workshop, inserts the floppy, types `r`, `-lisac-<prog>`, Return; `INPUT='text\n'` types into the program; `RUN_INSTR=N` runs longer | `shell.png`, `run.png` |
 | `emu/serve.sh floppy [port]` (`make PROG=x serve`) | interactive: serves granny-smith's web build (release `GS_VERSION`, downloaded into `build/gs-web/`; or `GS_WEB=dir`) with the floppy on one local origin; opening `/` boots a Lisa 2 with LOS 3.1 from the ProFile and the floppy in the drive. ROM and ProFile: `media/` if present, else archive.org copies (`MEDIA=archive` forces those). In a Codespace it prints the forwarded address | (a browser) |
-| `emu/run-los-tool.sh floppy [out]` | boots LOS, inserts the floppy, clicks Repair, opens the diskette, tears off and opens a document; `CLOSE=1` then chooses File/Print > Set Aside; `LATER=N` runs N instructions after opening; `SAVE=file.dc42` saves the floppy as the Lisa left it | `1-inserted` ... `6-later`, `7-menu`, `8-closed` |
+| `emu/run-los-tool.sh floppy [out]` | boots LOS, inserts the floppy, opens the diskette, tears off and opens a document; `CLOSE=1` then chooses File/Print > Set Aside; `LATER=N` runs N instructions after opening; `SAVE=file.dc42` saves the floppy as the Lisa left it | `1-inserted` ... `6-later`, `7-menu`, `8-closed` |
 | `emu/boot-los.sh [floppy] [out]` | boots LOS (and inserts a floppy) | `desktop.png`, `floppy.png` |
 
 Each writes its emulator script (`*.script`) and log (`*.log`) into the output
@@ -61,7 +61,7 @@ Run: `gs-headless --speed=turbo rom=<rom> model=lisa script=<file>`.
   `machine.floppy.drive.0.export` (or `machine.hd.save`) to get them out.
 - Insert floppies after boot: a fresh Lisa may try to start from the floppy,
   and lisa-c floppies are not bootable.
-- Icon and button positions on a freshly repaired single-tool diskette are
+- Icon and button positions on a single-tool diskette are
   fixed (see `run-los-tool.sh`): the stationery pad at (70, 58), the tool icon
   at (191, 58), a torn-off document at (36, 55); a set-aside document goes to
   the bottom left of the desktop (58, 338). Opening the tool icon starts the

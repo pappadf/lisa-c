@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Run a lisa-c floppy interactively: serve granny-smith's web build locally
 # and print a link that boots a Lisa 2 with the Office System 3.1 ProFile and
-# the floppy in the drive.  Open the link in a browser; insert-and-Repair,
-# open the diskette and tear off a sheet as on a real Lisa.
+# the floppy in the drive.  Open the link in a browser, then open the
+# diskette and tear off a sheet as on a real Lisa.
 #
 #   emu/serve.sh floppy.dc42 [port]
 #

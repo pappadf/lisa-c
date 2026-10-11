@@ -20,7 +20,7 @@ make PROG=hellotool serve    # run it interactively: granny-smith in the browser
 
 - `make run` puts its screenshot in `build/emu-<prog>/run.png`.
 - To type input into a running program, set `INPUT='text\n'` for `make run`, or add `tests/<name>/input.txt` for `make test`.
-- A Workshop program builds and runs in about 10 seconds, and a desktop-tool test in about 90 seconds (it boots LOS, repairs the floppy, opens a document and sets it aside).
+- A Workshop program builds and runs in about 10 seconds, and a desktop-tool test in about 90 seconds (it boots LOS, inserts the floppy, opens a document and sets it aside).
 
 **Running needs the emulator and your own Apple software** (never part of this repository), set up in `emu/env.sh`:
 - `gs-headless`, granny-smith's headless emulator: `GS_HEADLESS`, `build/gs/gs-headless`, the `PATH`, or a granny-smith checkout next to lisa-c.
@@ -55,12 +55,12 @@ Coding agents: see `AGENTS.md` and the skills in `.agents/skills/`.
    It also routes code references through the **jump table**: calls between segments, function pointers, and `lea`/`pea` of functions. Calls within a segment stay direct. At run time the loader copies the jump-table descriptors to the top of the stack segment, so descriptor *i* of *n* is at `$F80000 − 6n + 6i` (measured).
 
    `tools/objdump_lisa.py` dumps any Lisa object file.
-4. `tools/mklisafs.py` (via `tools/mkdisk.sh`) writes a new 400K diskette image, volume `LisaC`, holding the files. It builds the whole Office System 3.1 file system itself (MDDF, bitmap, s-list, B-tree catalog, file hint pages and sector tags), so no Apple disk is needed. The diskette has no boot tracks, so it is a data disk only.
+4. `tools/mklisafs.py` (via `tools/mkdisk.sh`) writes a new 400K diskette image, volume `LisaC`, holding the files. It builds the whole Office System 3.1 file system itself (MDDF, bitmap, s-list, B-tree catalog, file hint pages and sector tags), so no Apple disk is needed. The diskette has no boot tracks, so it is a data disk only. It also writes the Desktop Manager's catalog (`{!CATALOG}`), with the tool, its stationery pad and any documents given with `DISKARGS='--document NAME TOOLNUM SUFFIX=FILE'`, so the Office System uses the disk as it is. `tools/lisadisk.py` reads a diskette back, including one the Lisa has written (`files`, `desktop`, `extract`).
 
-   For a desktop tool (`make tool`) the files are `{T20}obj` and `{T20}PHRASE`. The phrase file is compiled from `<prog>.phrase` by `tools/phrasec.py`, and `{T20}obj` gets a file label that names the tool on the desktop (`TOOLNAME`).
+   For a desktop tool (`make tool`) the files are `{T20}obj` and `{T20}PHRASE`. The phrase file is compiled from `<prog>.phrase` by `tools/phrasec.py`, and `{T20}obj` gets a file label that names the tool on the desktop (`TOOLNAME`). The floppy is named `DISKNAME` (default: `TOOLNAME`) and holds the Desktop Manager's catalog (`{!CATALOG}`), which registers the tool and its stationery pad, so the Office System uses the disk without asking to Repair it.
 5. To run:
    - **Workshop programs:** `emu/run-workshop.sh` boots the Workshop ProFile image, inserts the floppy, and types `r`, `-lisac-<prog>`, Return (and `INPUT`, if set).
-   - **Desktop tools:** `emu/run-los-tool.sh` boots LOS 3.1, inserts the floppy, repairs it (which registers the tool), opens the diskette and a new document, and with `CLOSE=1` chooses File/Print > Set Aside.
+   - **Desktop tools:** `emu/run-los-tool.sh` boots LOS 3.1, inserts the floppy, opens the diskette and a new document, and with `CLOSE=1` chooses File/Print > Set Aside.
 
 ## Memory layout
 

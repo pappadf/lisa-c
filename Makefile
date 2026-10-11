@@ -128,10 +128,15 @@ test-%:
 #                                   compare with $(EXPECT)/tools/hellotool/{opened,closed}.png
 # The phrase file (menus and alerts) is compiled from $(SRCDIR)/$(PROG).phrase
 # by tools/phrasec.py.  TOOLNAME is the name the desktop shows for the tool
-# (a file label on {Tn}obj); it defaults to the program name.
+# (a file label on {Tn}obj); it defaults to the program name.  DISKNAME names
+# the floppy (default: TOOLNAME).  The floppy has a desktop catalog, so the
+# Office System mounts it without asking to Repair it.  DISKARGS: more
+# tools/mklisafs.py arguments, e.g. --document NAME TOOLNUM SUFFIX=FILE to put
+# a ready-made document on the floppy.
 TOOLNUM ?= 20
 TOOLNAME_hellotool := Hello
 TOOLNAME ?= $(or $(TOOLNAME_$(PROG)),$(PROG))
+DISKNAME ?= $(TOOLNAME)
 
 build/%.phrase: $(SRCDIR)/%.phrase tools/phrasec.py | build
 	python3 -I tools/phrasec.py $< $@
@@ -142,7 +147,7 @@ tool: build/$(PROG).phrase
 	rm -rf build/tool-$(PROG) && mkdir -p build/tool-$(PROG)
 	cp build/$(PROG).obj 'build/tool-$(PROG)/{T$(TOOLNUM)}obj'
 	cp build/$(PROG).phrase 'build/tool-$(PROG)/{T$(TOOLNUM)}PHRASE'
-	tools/mkdisk.sh -t '$(TOOLNAME)' build/$(PROG)-tool.dc42 build/tool-$(PROG)/*
+	tools/mkdisk.sh -n '$(DISKNAME)' -t '$(TOOLNAME)' $(DISKARGS) build/$(PROG)-tool.dc42 build/tool-$(PROG)/*
 
 # make PROG=hellotool serve     -> build the tool's floppy and run it interactively in
 #                                 granny-smith's web build (emu/serve.sh prints the link)

@@ -19,7 +19,7 @@ Two kinds of program:
 | `tests/<name>/` | Workshop test programs (`input.txt` = typed input) |
 | `include/lisa/` | C headers for the Lisa libraries, one per unit (42), generated from Apple's Pascal interfaces: QuickDraw, Window Manager, menus, alerts, Filer protocol, Clipboard, field editor, printing, fonts, hardware, … `lisa/desktop.h` includes them all |
 | `runtime/` | Startup code, PASLIB console glue, POSIX layer for picolibc |
-| `tools/` | The pipeline: `lisalink.py` (link), `elf2lisa.py` (Lisa object format), `phrasec.py` (phrase files), `mklisafs.py` (floppy file system), generators for library thunks and OS-call stubs |
+| `tools/` | The pipeline: `lisalink.py` (link), `elf2lisa.py` (Lisa object format), `phrasec.py` (phrase files), `mklisafs.py` (floppy file system and desktop catalog), `lisadisk.py` (reading floppies the Lisa wrote: files, desktop objects), generators for library thunks and OS-call stubs |
 | `emu/` | Emulator scripts (`env.sh` = settings; see the `lisa-emulator` skill) |
 | `picolibc/` | Builds picolibc for the 68000 into `build/sysroot` |
 | `media/` | **Not in git.** The user's own Apple software: `lisa.rom`, `los31.image`, `workshop.image` |
