@@ -7,7 +7,7 @@ survive a call (PASLIB documents D3 and A2 as "registers used"; we have seen
 D3 clobbered by SYS1LIB calls).  So C code does not IUJSR into a library
 directly.  Each declaration
 
-    pascal RESULT Name(params) LISA_IU(LINKNAME);
+    pascal RESULT Name(params) LISA_IU(LINKNAME[, ARGBYTES, RESULTBYTES]);
 
 is a Pascal-convention call to the symbol NAME (Retro68 upper-cases pascal
 names), and this tool emits a thunk for it that saves D2-D7/A2-A6, copies the
@@ -68,11 +68,16 @@ def main():
                 kind.add(b)
     os.makedirs(outdir, exist_ok=True)
     count = 0
-    for m in re.finditer(r'pascal\s+([\w\s\*]+?)\s*\b(\w+)\s*\(([^)]*)\)\s*LISA_IU\((\w+)\)\s*;', text):
+    decl = (r'pascal\s+([\w\s\*]+?)\s*\b(\w+)\s*\(([^)]*)\)\s*'
+            r'LISA_IU\((\w+)(?:\s*,\s*(\d+)\s*,\s*(\d+))?\)\s*;')
+    for m in re.finditer(decl, text):
         ret, name, params, trap = m.group(1).strip(), m.group(2), ' '.join(m.group(3).split()), m.group(4)
-        plist = [] if params in ('', 'void') else [p.strip() for p in params.split(',')]
-        n = sum(slot_size(p, pointer_types) for p in plist)
-        r = 0 if ret == 'void' else slot_size(ret, pointer_types)
+        if m.group(5) is not None:              # byte counts given (generated headers)
+            n, r = int(m.group(5)), int(m.group(6))
+        else:                                   # derive them from the C types
+            plist = [] if params in ('', 'void') else [p.strip() for p in params.split(',')]
+            n = sum(slot_size(p, pointer_types) for p in plist)
+            r = 0 if ret == 'void' else slot_size(ret, pointer_types)
         a = addr[trap]
         label = name.upper()
         lines = [f'| {ret} {name}({params}) -> {trap} ${a:06X}: {n} bytes of arguments, {r} of result',

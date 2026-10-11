@@ -17,7 +17,7 @@ Two kinds of program:
 |---|---|
 | `examples/<name>/` | Programs: every `.c` in the directory, and for a desktop tool `<name>.phrase` (menus, alerts). An app elsewhere passes `SRCDIR=/path` |
 | `tests/<name>/` | Workshop test programs (`input.txt` = typed input) |
-| `include/lisa/` | C headers for the Lisa libraries (QuickDraw, windows, menus, alerts, Filer, scroll bars and size control, …) |
+| `include/lisa/` | C headers for the Lisa libraries, one per unit (42), generated from Apple's Pascal interfaces: QuickDraw, Window Manager, menus, alerts, Filer protocol, Clipboard, field editor, printing, fonts, hardware, … `lisa/desktop.h` includes them all |
 | `runtime/` | Startup code, PASLIB console glue, POSIX layer for picolibc |
 | `tools/` | The pipeline: `lisalink.py` (link), `elf2lisa.py` (Lisa object format), `phrasec.py` (phrase files), `mklisafs.py` (floppy file system), generators for library thunks and OS-call stubs |
 | `emu/` | Emulator scripts (`env.sh` = settings; see the `lisa-emulator` skill) |
@@ -51,21 +51,30 @@ make toolchain                 # download the prebuilt compiler (once)
   and programs must all be built with it, because its C calling convention
   differs from other m68k GCCs.
 - Python 3, make, meson + ninja (picolibc, built on first use).
-- `ENTRIES` (default `../lisa-c-private/data/entries.tsv`): the library entry-point
-  table, made from the Workshop's library files with `tools/gen_entries.py`.
+- `data/entries.tsv` (`ENTRIES`): the libraries' entry points, link name ->
+  jump-vector address (interface facts, made from the Workshop 3.0 library files
+  with `tools/gen_entries.py`; the same vectors as LOS 3.1).
 - To run anything: `gs-headless` and the files in `media/` (see `emu/env.sh`).
 - `make test` compares screenshots with `EXPECT` (default `../lisa-c-private/tests`);
   a test without a reference screenshot reports SKIP.
 
 ## Rules
 
-- **Never commit Apple software or data derived from it**: ROMs, disk images,
-  library files, `entries.tsv`, LOS screenshots. `media/` and `build/` are ignored.
+- **Never commit Apple software**: ROMs, disk images, library files, and LOS
+  screenshots (which show Apple's screens). `media/` and `build/` are ignored.
+  Interface facts are fine: routine names, entry addresses, record layouts.
 - Library routines are called through the `pascal` declarations in
   `include/lisa/*.h`. Each goes through a generated register-saving thunk,
   because the Lisa libraries clobber registers C expects preserved (D3, A2, …).
-  Add a routine by declaring it there with `LISA_IU(LINKNAME)`; the build
-  generates its thunk.
+- The headers are generated (`tools/gen_headers.py`, `make headers` with the
+  Lisa source): do not edit them; notes and helpers go in
+  `tools/header_notes.py`. `make test-headers` checks every record layout.
+  Names are Apple's (Pascal is case-insensitive, so C uses the spelling of
+  the interface source, e.g. `allOK`, `cmdClosAll`; routine names start with
+  a capital: `InitMP`). Unit globals are macros (`thePort`, `deskPort`,
+  `theHeap`, ...). Enumeration values that are plain lowercase words (`frame`,
+  `draw`, `v`, `h`, ...) are left out so they do not take common names; text
+  styles are bit masks (`bold | underline`).
 - Pascal data layout in headers: bytes and booleans in the high byte of a word
   when passed by value; records rounded to whole words; packed boolean arrays
   are 1 bit per element (LSB first).

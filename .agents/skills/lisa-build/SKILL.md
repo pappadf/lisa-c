@@ -39,10 +39,18 @@ description: >
 - Lisa OS calls directly: `#include "lisa_os.h"` (generated; `lisa_open`,
   `lisa_make_dataseg`, `lisa_info_process`, `lisa_delay_time`, ...). Each takes
   `int16_t *ecode` first; Pascal strings (length byte first) for paths.
-- Lisa libraries (QuickDraw, windows, menus, alerts, Filer, ...):
-  `#include "lisa/desktop.h"` (or a single `lisa/*.h`). These are `pascal`
-  functions: strings are Pascal strings (`unsigned char s[]`, `s[0]` = length),
-  `VAR` parameters are pointers, `Point`/`Rect` as in QuickDraw.
+- Lisa libraries: `#include "lisa/desktop.h"` (all 42 units) or a single
+  `lisa/<unit>.h` (quickdraw, events, windows, folders, menus, alertmgr,
+  filercomm, scrap, fieldedit, fontmgr, wmlsb, wmlgrow, wmlcrs, hwint,
+  international, pmm, prmgr, ...). These are `pascal` functions: strings are
+  Pascal strings (`unsigned char s[]`, `s[0]` = length), `VAR` parameters and
+  records passed by value larger than 4 bytes are pointers. Names are Apple's
+  (`allOK`, `cmdClosAll`, `InitMP`); unit globals are macros (`thePort`,
+  `deskPort`, `theHeap`); text styles are masks (`bold | underline`);
+  enumeration values that are plain lowercase words (`frame`, `draw`) are
+  left out.
+- The OS's record types (`fs_info`, `pathname`, ...) for `lisa_os.h` calls:
+  `lisa/ostypes.h`.
 - Multiple code segments are made automatically (up to 16 x 32 KB).
 
 ## Pipeline (what `make` runs)
@@ -81,9 +89,10 @@ the entry table `ENTRIES`).
 
 ## Troubleshooting
 
-- `ENTRIES ... is missing`: make the entry table with `tools/gen_entries.py`
-  from the Workshop 3.0 library files (`IOSPASLIB.OBJ`, `SYS1LIB.OBJ`, ...).
-- Link errors about a library routine: declare it in `include/lisa/*.h` with
-  `LISA_IU(LINKNAME)` (the link name is in the entry table).
+- A routine missing from the headers (they cover the units in a tool's unit
+  table): declare it in your own source as
+  `pascal RESULT Name(params) LISA_IU(LINKNAME, ARGBYTES, RESULTBYTES);`
+  with its link name from `data/entries.tsv`; the build makes its thunk only
+  for declarations in `include/lisa`, so add it there or ask for the unit.
 - Never link objects from another m68k compiler (D2 and `short` arguments are
   handled differently).

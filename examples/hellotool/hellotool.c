@@ -19,7 +19,7 @@ enum { mSetAsideAll = 1, mSetAside = 2, mPutBack = 4 };   /* File/Print items */
 
 static char heap[8192];                 /* QuickDraw / Window Manager heap */
 static MenuInfo menus[1];               /* built from the phrase file */
-static PAlertRec alertFile;
+static TAlertFile alertFile;
 static WindowPtr myWindow;
 
 static pascal Integer HeapFull(void *zone, Integer bytesNeeded)
@@ -95,7 +95,7 @@ static void menu_command(Integer menu, Integer item)
     if (menu != menus[0].menuId)
         return;
     switch (item) {
-    case mSetAsideAll: DoFilingCmd(cmdCloseAll); break;
+    case mSetAsideAll: DoFilingCmd(cmdClosAll); break;
     case mSetAside:    DoFilingCmd(cmdClose); break;
     case mPutBack:
         TellFiler(&err, docClosd, docPutBack, myWindow);
@@ -124,7 +124,7 @@ static void filer_event(EventRecord *ev, int *done)
     case fcPut:
     case fcCopy:
     case fcShred:
-        TellFiler(&err, docClosd, allOk, ev->who);
+        TellFiler(&err, docClosd, allOK, ev->who);
         myWindow = 0;
         break;
     case fcTerminate:
@@ -153,7 +153,7 @@ int main(void)
     tool_prefix(prefix);
     InitMP(theHeap, prefix, (void *)FailedAlert, 2, menus, &alertFile, &err);
     if (err > 0) {
-        TellFiler(&err, initFailed, internalError, 0);
+        TellFiler(&err, InitFailed, internalError, 0);
         ImDying();
         return 1;
     }

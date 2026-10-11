@@ -86,6 +86,6 @@ purpose, look at the new screenshot, then copy it over the reference.
 - **Memory:** `machine.memory.peek.l <addr>`; the program's data segment is at
   `$D60000`, the heap at `$E00000`.
 - **Which library routine is at a PC:** look the address up in the entry
-  table (`ENTRIES`: link name -> jump-vector address).
+  table `data/entries.tsv` (link name -> jump-vector address).
 - Interactive debugging: `gs-headless --daemon` opens a TCP shell on port
   6800 (see granny-smith's `headless-debug` skill).

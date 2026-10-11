@@ -29,15 +29,20 @@
 #if defined(pascal)                     /* Retro68: pascal = __attribute__((__pascal__)) */
 #define LISA_HAVE_PASCAL 1
 #ifdef LISA_IU_INLINE
-#define LISA_IU(name) = { LISA_TRAP_##name }
+#define LISA_IU(name, ...) = { LISA_TRAP_##name }
 #else
-#define LISA_IU(name)
+#define LISA_IU(name, ...)
 #endif
 #else
 #define LISA_HAVE_PASCAL 0
 #define pascal
-#define LISA_IU(name)
+#define LISA_IU(name, ...)
 #endif
+/* LISA_IU(LINK, ARGBYTES, RESULTBYTES): the routine's link name (its jump
+ * vector in data/entries.tsv) and the bytes of arguments and of function
+ * result on the stack, for the thunk generator.  The byte counts may be
+ * omitted in hand-written declarations; they are then derived from the
+ * parameter types. */
 
 /* Global variables of intrinsic units (thePort, theHeap, menuFolder, ...)
  * live in each unit's data area.  A program reaches unit n through its
@@ -55,7 +60,5 @@ static inline char *lisa_unit_data(int unit)
 typedef int16_t Integer;                /* Pascal INTEGER */
 typedef int32_t LongInt;                /* Pascal LONGINT */
 typedef bool Boolean;                   /* Pascal BOOLEAN: one byte */
-typedef unsigned char Str255[256];      /* Pascal string[255]: length byte + characters */
-typedef unsigned char Str32[34];        /* string[32] (e_name), padded to even */
 
 #endif

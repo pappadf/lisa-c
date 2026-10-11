@@ -37,13 +37,15 @@ lisa_declare_excep_hdl(&err, "\015SYS_TERMINATE" /* Pascal string, copied to RAM
 SetPort(deskPort);                            /* before InitHeap/InitMP, or InitMP hangs */
 InitHeap(heap, heap + sizeof heap, (void *)HeapFull);
 InitMP(theHeap, prefix, (void *)FailedAlert, PHRASE_VERSION, menus, &alerts, &err);
-if (err > 0) { TellFiler(&err, initFailed, internalError, 0); ImDying(); return 1; }
+if (err > 0) { TellFiler(&err, InitFailed, internalError, 0); ImDying(); return 1; }
 InitWmlCrs(&err);
 ```
 
 - `prefix` is `-<volume>-{Tn}` (the phrase file's path without `PHRASE`);
   hellotool derives it from its own program path (`lisa_info_process`).
 - `PHRASE_VERSION` must equal the first number in the phrase source.
+- `alerts` is a `TAlertFile` (a handle, `static TAlertFile alerts;`), passed
+  to StopAlert, CautionAlert, ... afterwards.
 - `menus` is an array of `MenuInfo`, one per menu in the phrase file, filled by
   `InitMP` in file order.
 
@@ -75,10 +77,10 @@ call `LetOthersRun`, as Apple's tools do.
 |---|---|
 | `fcResume` | open the document: window `ev.who` (`TakeWindow`), diskfile prefix `fx.thePrefix`. No reply. |
 | `fcNone` | the tool icon was opened: a window but no document (empty prefix) |
-| `fcClose` | make the edits permanent, then `TellFiler(&err, docClosd, allOk, ev.who)` |
+| `fcClose` | make the edits permanent, then `TellFiler(&err, docClosd, allOK, ev.who)` |
 | `fcSuspend` | save the working state (edits kept separate), reply as above |
 | `fcPut`, `fcCopy` | write the document to the new prefix `fx.thePrefix`; reply `docXfered` (fcPut also closes) |
-| `fcShred` | just close: `docClosd, allOk` |
+| `fcShred` | just close: `docClosd, allOK` |
 | `fcTerminate` | leave the loop |
 | anything else | `TellFiler(&err, docClosd, internalError, ev.who)` |
 
@@ -91,7 +93,7 @@ exist yet, it is a new document.
 
 Menu commands:
 - "Set Aside" = `DoFilingCmd(cmdClose)`, "Set Aside Everything" =
-  `DoFilingCmd(cmdCloseAll)`. On LOS 3.1 Set Aside only hides the window: the
+  `DoFilingCmd(cmdClosAll)`. On LOS 3.1 Set Aside only hides the window: the
   tool keeps the document open and gets no event; reopening shows it again.
 - "Save & Put Away": save as for `fcClose`, then
   `TellFiler(&err, docClosd, docPutBack, window)` and forget the document.
@@ -99,7 +101,7 @@ Menu commands:
   the saved version separate from the working state).
 - Name the document in Set Aside: `GetFldrTitle(window, title)`, then `SetItem`.
 
-## Window controls (`lisa/scrollbars.h`)
+## Window controls (`lisa/wmlsb.h`, `lisa/wmlgrow.h`)
 
 Office System windows draw their own scroll bars and size control, only while
 active:

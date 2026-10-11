@@ -20,7 +20,10 @@ AR      := $(CROSS)ar
 CFLAGS  := -m68000 -Os -ffreestanding -fno-builtin -fno-pic -ffixed-a5 \
            -fno-asynchronous-unwind-tables -fno-tree-loop-distribute-patterns \
            -ffunction-sections -fdata-sections \
-           -Wall -Wextra -Iruntime -Iinclude -Ibuild/include -isystem build/sysroot/include
+           -Wall -Wextra -Wno-missing-braces \
+           -Iruntime -Iinclude -Ibuild/include -isystem build/sysroot/include
+# (-Wno-missing-braces: Pascal variant records such as Rect and Point are
+# unions in C, and Rect r = {0, 0, 0, 0} is the natural way to write one.)
 SYSROOT := build/sysroot/lib
 LIBGCC  := $(shell $(CC) -m68000 -print-libgcc-file-name 2>/dev/null)
 LIBS     = build/lib/liblisa.a build/lib/liblisaiu.a $(SYSROOT)/libc.a $(SYSROOT)/libm.a $(LIBGCC)
@@ -31,15 +34,16 @@ PROG    ?= hello
 SRCDIR   = $(firstword $(wildcard examples/$(PROG) tests/$(PROG)))
 SRCS     = $(if $(SRCDIR),$(wildcard $(SRCDIR)/*.c))
 OBJS     = $(patsubst $(SRCDIR)/%.c,build/$(PROG)/%.o,$(SRCS))
-TESTS   := $(notdir $(patsubst %/,%,$(wildcard tests/*/)))
+TESTS   := $(filter-out headers,$(notdir $(patsubst %/,%,$(wildcard tests/*/))))
 
-# Data derived from Apple's software, kept outside this repository:
-#   $(ENTRIES)  library entry points (link name -> jump vector), made from the
-#               Workshop's library files by tools/gen_entries.py
-#   $(EXPECT)   reference screenshots for `make test`: <test>/expected.png and
-#               tools/<tool>/{opened,closed}.png
+# ENTRIES: the intrinsic libraries' entry points (link name -> jump-vector
+# address), the interface facts IUJSR calls need; made from the Workshop 3.0
+# library files by tools/gen_entries.py (the same vectors as LOS 3.1).
+# EXPECT: reference screenshots for `make test` (<test>/expected.png and
+# tools/<tool>/{opened,closed}.png); they show Apple's screens, so they are
+# kept outside this repository.
 PRIVATE ?= ../lisa-c-private
-ENTRIES ?= $(PRIVATE)/data/entries.tsv
+ENTRIES ?= data/entries.tsv
 EXPECT  ?= $(PRIVATE)/tests
 TOOL_TESTS := $(notdir $(patsubst %/,%,$(wildcard $(EXPECT)/tools/*/)))
 
@@ -56,9 +60,6 @@ $(SYSROOT)/libc.a $(SYSROOT)/libm.a: picolibc/build.sh | build
 	CROSS=$(CROSS) picolibc/build.sh > build/picolibc.log 2>&1 || (tail -20 build/picolibc.log; exit 1)
 
 # Generated lisa/traps.h (IUJSR words per library entry point)
-$(ENTRIES):
-	@echo "$@ is missing: make it with tools/gen_entries.py from the Workshop library files" >&2; exit 1
-
 build/include/lisa/traps.h: $(ENTRIES) tools/gen_traps.py
 	mkdir -p build/include/lisa
 	python3 -I tools/gen_traps.py $< $@
@@ -107,7 +108,13 @@ run: build/$(PROG).dc42
 
 # Run in the emulator and compare the screen with $(EXPECT)/<name>/expected.png
 # (SKIP when there is no reference screenshot).
-test: $(addprefix test-,$(TESTS)) $(addprefix test-tool-,$(TOOL_TESTS))
+test: test-headers $(addprefix test-,$(TESTS)) $(addprefix test-tool-,$(TOOL_TESTS))
+
+# The headers against the Pascal layouts (record sizes, field offsets,
+# parameter sizes): a file of compile-time assertions.
+test-headers: build/include/lisa/traps.h $(SYSROOT)/libc.a
+	@$(CC) $(CFLAGS) -fsyntax-only tests/headers/layout.c && \
+	 echo "PASS: headers ($$(grep -c _Static_assert tests/headers/layout.c) checks)"
 test-%:
 	@$(MAKE) --no-print-directory PROG=$* build/$*.dc42 >/dev/null
 	@INPUT="$$(cat tests/$*/input.txt 2>/dev/null)" emu/run-workshop.sh build/$*.dc42 $* build/emu-$* >/dev/null
@@ -149,6 +156,20 @@ test-tool-%:
 	    cmp -s build/emu-tool-$*/8-closed.png $(EXPECT)/tools/$*/closed.png; then echo "PASS: tool $*"; \
 	 else echo "FAIL: tool $* (see build/emu-tool-$*/)"; exit 1; fi
 
+# ---- Regenerating the headers ---------------------------------------------
+# include/lisa/<unit>.h and tests/headers/layout.c are generated from the
+# INTERFACE sections of the units' Pascal sources (the CHM Lisa source
+# release): tools/pascal_iface.py extracts them, tools/gen_headers.py writes
+# the headers.  LISA_SOURCE is the Lisa_Source/LISA_OS/LIBS directory;
+# tools/header_units.txt lists the units in dependency order.  Not needed
+# to build programs.
+LISA_SOURCE ?=
+headers:
+	@[ -n "$(LISA_SOURCE)" ] || { echo "set LISA_SOURCE to Lisa_Source/LISA_OS/LIBS" >&2; exit 1; }
+	mkdir -p build
+	python3 -I tools/pascal_iface.py build/iface.json $(addprefix $(LISA_SOURCE)/,$(shell cat tools/header_units.txt))
+	python3 -I tools/gen_headers.py build/iface.json $(ENTRIES) include/lisa tests/headers/layout.c
+
 # ---- The compiler ------------------------------------------------------------
 # Prebuilt by .github/workflows/toolchain.yml (Retro68 GCC for m68k, trimmed by
 # tools/package_toolchain.sh) and published as a release of pappadf/lisa-c.
@@ -164,6 +185,6 @@ toolchain:
 clean:
 	rm -rf build
 
-.PHONY: all disk run test clean tool toolchain serve
+.PHONY: all disk run test clean tool toolchain serve headers test-headers
 .SECONDARY:
 .DELETE_ON_ERROR:
