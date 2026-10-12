@@ -271,12 +271,18 @@ class Gen:
                 nbytes += 4
             else:
                 want = {'long': 4, 'word': 2, 'byte': 1}[p['kind']]
-                if t['kind'] == 'set' and t['size'] == 1:
+                base = self.kind.get((t.get('name') or '').lower(), t)
+                # Pascal passes a one-byte value in a stack word.  A BOOLEAN
+                # is in the high byte, as C pushes a char; a one-byte set or a
+                # CHAR is in the low byte (QuickDraw's DrawChar reads 7(SP)),
+                # so C must pass it as an Integer.
+                low = (t['kind'] == 'set' and t['size'] == 1) or base['kind'] == 'char'
+                if low:
                     want = 2
-                self.probe.append(f'_Static_assert(sizeof({self.ctype(t) if not (t["kind"] == "set" and t["size"] == 1) else "Integer"}) == {want}, '
+                self.probe.append(f'_Static_assert(sizeof({self.ctype(t) if not low else "Integer"}) == {want}, '
                                   f'"{r["name"]}.{p["name"]}");')
-                if t['kind'] == 'set' and t['size'] == 1:
-                    params.append(f'Integer {pname}')          # one-byte set: value in the low byte
+                if low:
+                    params.append(f'Integer {pname}')          # value in the low byte
                 else:
                     params.append(self.ctype(t, pname))
                 nbytes += 4 if p['kind'] == 'long' else 2

@@ -62,7 +62,7 @@ pascal void CaretErased(hndField hf, hndFState hfs) LISA_IU(CARETERA, 8, 0);
 pascal void StartBlink(Integer *t) LISA_IU(STARTBLI, 4, 0);
 pascal void BlinkCaret(hndField hf, hndFState hfs, Integer *t) LISA_IU(BLINKCAR, 12, 0);
 pascal void CaretOn(hndField hf, hndFState hfs) LISA_IU(CARETON, 8, 0);
-pascal void InsCh(char ch, hndField hf, hndFState hfs, Integer *errNum) LISA_IU(INSCH, 14, 0);
+pascal void InsCh(Integer ch, hndField hf, hndFState hfs, Integer *errNum) LISA_IU(INSCH, 14, 0);
 pascal void Backspace(hndField hf, hndFState hfs, Integer *errNum) LISA_IU(BACKSPAC, 12, 0);
 pascal void Forwardspace(hndField hf, hndFState hfs, Integer *errNum) LISA_IU(FORWARDS, 12, 0);
 pascal void BackWord(hndField hf, hndFState hfs, Integer *errNum) LISA_IU(BACKWORD, 12, 0);

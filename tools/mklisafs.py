@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Make a 400K Lisa Office System (file system version 17) diskette image.
 
-    mklisafs.py [-n NAME] [-t TOOLNAME] [--date YYYY-MM-DD]
-                [--document NAME TOOL SUFFIX=FILE]... out.dc42 [file...]
+    mklisafs.py [-n NAME] [-t TOOLNAME] [--tool-only] [--window T,L,B,R]
+                [--date YYYY-MM-DD] [--document NAME TOOL SUFFIX=FILE]...
+                out.dc42 [file...]
 
 Writes a DiskCopy 4.2 image of an initialized, empty volume (default name
 "LisaC") holding the given host files, each under its basename.  The disk is
@@ -19,6 +20,18 @@ of asking to Repair it.  It holds what Repair (RecoverCatalog) would make:
 the disk (named as the volume), the Wastebasket, the Clipboard, the Empty
 Folders pad, and for each tool ({Tn}obj) the tool and its "<name> Paper"
 stationery pad.
+
+The Office System has two kinds of tool.  A document tool (LisaWrite,
+LisaDraw, ...) makes documents from its stationery pad.  A tool without
+documents (the Calculator, the Clock) is opened from its own icon: the
+Desktop Manager starts it with fcNone and gives it a window, and makes no
+pad for it.  --tool-only makes the tool the second kind: "tools only"
+(toolOnly) in its label and noDocs in its catalog record (APDM-CAT: props
+bit 1, "tool doesn't use stationery pads"), and no pad.  Such a tool can
+still own documents that come to be otherwise (a paste, a copy).
+--window gives the window the tool gets when it is opened from its icon
+(top, left, bottom, right in screen pixels; default 40,10,290,640, a
+"LisaWrite Paper"-sized window is 33,2,314,716).
 
 --document adds a ready-made document for tool TOOL, named NAME on the
 desktop: a catalog record (id 101 and up, after the tools') and its files,
@@ -222,10 +235,14 @@ CAT_FIELDS = [(0, 3, 4), (4, 9, 4), (8, 6, 4), (12, 2, 2), (14, 1, 1), (15, 1, 1
               (46, 2, 2), (48, 3, 4), (42, 3, 4), (52, 10, 4)]
 
 
-def cat_record(parent, ident, kind, name, rect=(40, 10, 290, 640), created=NIL4,
-               size=0, tool=NIL4):
+TOOL_RECT = (40, 10, 290, 640)
+PROP_NODOCS = 1 << 1                    # props: manyDocs = bit 0, noDocs = bit 1
+
+
+def cat_record(parent, ident, kind, name, rect=TOOL_RECT, created=NIL4,
+               size=0, tool=NIL4, props=0):
     name = name.encode('mac_roman')
-    r = struct.pack('>lHHlhBBH4hhhLLLLHLHH', parent, len(name), 56, ident, kind, 0x80, 0, 0,
+    r = struct.pack('>lHHlhBBH4hhhLLLLHLHH', parent, len(name), 56, ident, kind, 0x80, 0, props,
                     *rect, 0x7FFF, 0x7FFF, created, NIL4, size, tool, NIL2, NIL4,
                     0, 56 + len(name)) + name
     return r + b'\xff' * (len(r) & 1)
@@ -244,19 +261,22 @@ def cat_header(uid, size, nrecs, root, next_id):
     return bytes(h)
 
 
-def desktop_catalog(vol, tools, docs, uid, uid_r):
+def desktop_catalog(vol, tools, docs, uid, uid_r, tool_only=False, window=TOOL_RECT):
     """{!CATALOG} and {!CATALOG}$R for a volume with the given tools,
     [(tool number, name, disk blocks of its files)], and documents,
-    [(id, name, tool number, disk blocks of its files)]."""
+    [(id, name, tool number, disk blocks of its files)].  tool_only: the
+    tools have no stationery (see --tool-only); window: their window."""
     recs = [cat_record(0, ID_SCRAP, K_SCRAP, 'Clipboard', rect=(315, 10, 360, 640)),
             cat_record(0, ID_DISK, K_DISK, vol.name.decode('mac_roman')),
             cat_record(0, ID_TRASH, K_TRASH, 'Wastebasket'),
             cat_record(ID_DISK, ID_FOLDERPAD, K_FOLDERPAD, 'Empty Folders', created=vol.when)]
     ident = ID_FIRST
     for num, name, blocks in tools:
-        recs.append(cat_record(ID_DISK, ident, K_TOOL, name, created=vol.when, size=blocks, tool=num))
-        recs.append(cat_record(ID_DISK, ident + 1, K_PAD, name + ' Paper', rect=(33, 2, 314, 716),
-                               created=vol.when, tool=num))
+        recs.append(cat_record(ID_DISK, ident, K_TOOL, name, rect=window, created=vol.when, size=blocks,
+                               tool=num, props=PROP_NODOCS if tool_only else 0))
+        if not tool_only:
+            recs.append(cat_record(ID_DISK, ident + 1, K_PAD, name + ' Paper', rect=(33, 2, 314, 716),
+                                   created=vol.when, tool=num))
         ident += 2
     for ident, name, num, blocks in docs:
         recs.append(cat_record(ID_DISK, ident, K_DOC, name, rect=(33, 2, 314, 716),
@@ -278,12 +298,12 @@ def desktop_catalog(vol, tools, docs, uid, uid_r):
     return main, cat_header(uid_r, 512, 0, -1, 1)
 
 
-def tool_label(name):
-    """The Desktop Manager's file label for a tool."""
+def tool_label(name, tool_only=False, window=TOOL_RECT):
+    """The Desktop Manager's file label for a tool (LabelFmt, APDM-GLOBALS)."""
     b = name.encode('mac_roman')
     if len(b) > 63:
         raise SystemExit('tool name longer than 63 characters')
-    return struct.pack('>HB63sHBB4hhll', 2, len(b), b, 24, False, False, 40, 10, 290, 640, -32768, 0, 1)
+    return struct.pack('>HB63sHBB4hhll', 2, len(b), b, 24, tool_only, False, *window, -32768, 0, 1)
 
 
 def dc42_sum(b):
@@ -305,6 +325,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('-n', '--name', default='LisaC', help='volume name (default LisaC)')
     ap.add_argument('-t', '--tool-name', help='name shown for the tool ({Tn}obj) on the desktop')
+    ap.add_argument('--tool-only', action='store_true',
+                    help='the tool has no stationery: it is opened from its icon')
+    ap.add_argument('--window', help='the tool\'s window when opened from its icon: top,left,bottom,right')
     ap.add_argument('--date', default='1984-01-24', help='creation date of the volume and files')
     ap.add_argument('--document', nargs=3, action='append', default=[],
                     metavar=('NAME', 'TOOL', 'SUFFIX=FILE'),
@@ -314,6 +337,13 @@ def main():
     a = ap.parse_args()
     if '-' in a.name or len(a.name.encode('mac_roman')) > 32:
         sys.exit('bad volume name')
+    window = TOOL_RECT
+    if a.window:
+        try:
+            window = tuple(int(v) for v in a.window.split(','))
+            assert len(window) == 4
+        except (ValueError, AssertionError):
+            sys.exit('--window top,left,bottom,right')
     vol = Volume(a.name, lisa_time(datetime.datetime.fromisoformat(a.date)))
     tools = {}
     for f in a.files:
@@ -323,7 +353,7 @@ def main():
         if tool:
             tools[int(tool[1])] = a.tool_name or ''
             if a.tool_name:
-                label = tool_label(a.tool_name)
+                label = tool_label(a.tool_name, a.tool_only, window)
         vol.add(name, open(f, 'rb').read(), label)
     docs = []
     ident = ID_FIRST + 2 * len(tools)
@@ -348,7 +378,7 @@ def main():
             blocks[int(tool[1])] = blocks.get(int(tool[1]), 0) + 1 + npages
     sfile = FIRSTFILE + len(vol.files)
     main, recovery = desktop_catalog(vol, [(n, tools[n], blocks[n]) for n in sorted(tools)], docs,
-                                     vol.uid(sfile + 1), vol.uid(sfile))
+                                     vol.uid(sfile + 1), vol.uid(sfile), a.tool_only, window)
     vol.add(CAT_NAME + '$R', recovery)
     vol.add(CAT_NAME, main)
     open(a.out, 'wb').write(vol.image())

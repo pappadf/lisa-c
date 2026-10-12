@@ -28,11 +28,13 @@ import sys
 # TRAP #1 subcode (D0) of each call
 SUBCODES = {
     'make_file': 11, 'make_catalog': 13, 'kill_object': 15, 'rename_entry': 16, 'info': 18,
+    'read_label': 23, 'write_label': 24, 'reset_catalog': 35, 'get_next_entry': 36,
     'open': 19, 'close_object': 20, 'read_data': 21, 'write_data': 22, 'device_control': 25,
-    'truncate': 28, 'flush': 29, 'set_working_dir': 31, 'get_working_dir': 32,
+    'truncate': 28, 'flush': 29, 'set_working_dir': 31, 'get_working_dir': 32, 'mount': 33, 'unmount': 34,
     'terminate_process': 51, 'info_process': 53, 'make_dataseg': 70, 'kill_dataseg': 71,
     'close_dataseg': 73, 'size_dataseg': 74, 'info_dataseg': 75, 'info_ldsn': 79,
     'declare_excep_hdl': 90, 'delay_time': 104, 'get_time': 105,
+    'cdinfo': 140, 'cdmake': 141, 'cdkill': 142, 'osbootvol': 147,
 }
 
 # name: [(kind, param name, C type)]  -- the SYSCALL interface
@@ -49,10 +51,23 @@ SIGS = {
     'write_data':    [('var', 'ecode', 'int16_t *'), ('int', 'refnum', 'int16_t'), ('long', 'data_addr', 'const void *'),
                       ('long', 'count', 'int32_t'), ('var', 'actual', 'int32_t *'), ('byte', 'mode', 'uint8_t'), ('long', 'offset', 'int32_t')],
     'device_control': [('var', 'ecode', 'int16_t *'), ('var', 'path', 'const unsigned char *'), ('var', 'cparm', 'void *')],
+    # file labels (the bytes kept with a file outside its data; up to 128)
+    'read_label':    [('var', 'ecode', 'int16_t *'), ('var', 'path', 'const unsigned char *'), ('long', 'data_addr', 'void *'),
+                      ('long', 'count', 'int32_t'), ('var', 'actual', 'int32_t *')],
+    'write_label':   [('var', 'ecode', 'int16_t *'), ('var', 'path', 'const unsigned char *'), ('long', 'data_addr', 'const void *'),
+                      ('long', 'count', 'int32_t'), ('var', 'actual', 'int32_t *')],
+    # listing a volume: reset_catalog("-vol"), then get_next_entry(prefix, entry)
+    # returns the names that begin with prefix, one per call, until error 848
+    'reset_catalog': [('var', 'ecode', 'int16_t *'), ('var', 'path', 'const unsigned char *')],
+    'get_next_entry': [('var', 'ecode', 'int16_t *'), ('var', 'prefix', 'const unsigned char *'), ('var', 'entry', 'unsigned char *')],
     'truncate':      [('var', 'ecode', 'int16_t *'), ('int', 'refnum', 'int16_t')],
     'flush':         [('var', 'ecode', 'int16_t *'), ('int', 'refnum', 'int16_t')],
     'set_working_dir': [('var', 'ecode', 'int16_t *'), ('var', 'path', 'const unsigned char *')],
     'get_working_dir': [('var', 'ecode', 'int16_t *'), ('var', 'path', 'unsigned char *')],
+    # mount the volume (or sequential device) at devname; vname returns its volume name
+    'mount':         [('var', 'ecode', 'int16_t *'), ('var', 'vname', 'unsigned char *'),
+                      ('var', 'password', 'const unsigned char *'), ('var', 'devname', 'const unsigned char *')],
+    'unmount':       [('var', 'ecode', 'int16_t *'), ('var', 'vname', 'const unsigned char *')],
     'declare_excep_hdl': [('var', 'errnum', 'int16_t *'), ('var', 'excep_name', 'const unsigned char *'), ('long', 'entry_point', 'void *')],
     'info_process':  [('var', 'errnum', 'int16_t *'), ('long', 'proc_id', 'int32_t'), ('var', 'proc_info', 'void *')],
     'terminate_process': [('var', 'errnum', 'int16_t *'), ('long', 'event_ptr', 'void *')],
@@ -67,8 +82,20 @@ SIGS = {
     'info_ldsn':     [('var', 'errnum', 'int16_t *'), ('int', 'ldsn', 'int16_t'), ('var', 'refnum', 'int16_t *')],
     'delay_time':    [('var', 'errnum', 'int16_t *'), ('var', 'interval', 'const void *'), ('var', 'clktime', 'const void *')],  # records > 4 bytes: by address
     'get_time':      [('var', 'errnum', 'int16_t *'), ('var', 'gmt_time', 'void *')],
+    # configurable drivers: the_pos is a cd_position (CD_POS), the info a cd_infobuf (lisa/ostypes.h)
+    'cdinfo':        [('var', 'error', 'int16_t *'), ('long', 'the_pos', 'uint32_t'), ('var', 'the_info', 'void *')],
+    'cdmake':        [('var', 'error', 'int16_t *'), ('long', 'the_pos', 'uint32_t'), ('var', 'this_info', 'const void *')],
+    'cdkill':        [('var', 'error', 'int16_t *'), ('long', 'the_pos', 'uint32_t')],
+    'osbootvol':     [('var', 'error', 'int16_t *'), ('var', 'volname', 'unsigned char *')],
 }
 
+# Declared in lisa_os.h with the calls (cd_infobuf itself is in lisa/ostypes.h)
+TYPES = '''/* cd_position (lisa/ostypes.h: slot, chan, dev bytes) is word-sized and so passed
+   by value as a long; CD_POS builds it.  Positions are 1-based: slot 10 is the
+   built-in serial ports, chan 1 = Serial A, chan 2 = Serial B; 0 = none. */
+#define CD_POS(slot, chan, dev) \\
+    (((uint32_t)(uint8_t)(slot) << 24) | ((uint32_t)(uint8_t)(chan) << 16) | ((uint32_t)(uint8_t)(dev) << 8))
+'''
 
 
 def cdecl(params):
@@ -133,6 +160,7 @@ def main():
            '/* Lisa OS system calls (Pascal procedures via TRAP #1). Pathnames are Pascal strings. */',
            '#ifndef LISA_OS_H', '#define LISA_OS_H', '#include <stdint.h>',
            '#if !defined(pascal)', '#error "lisa_os.h needs a compiler with the pascal attribute (Retro68 GCC)"', '#endif', '']
+    hdr.append(TYPES)
     for name, params in SIGS.items():
         asm.append(gen_stub(name, params, SUBCODES[name]))
         hdr.append(f'pascal void lisa_{name}({cdecl(params)});')

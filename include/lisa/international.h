@@ -33,8 +33,8 @@ pascal void DownStrShift(CompStrP sP) LISA_IU(DOWNSTRS, 4, 0);
 pascal void DownChrShift(CompChrP pc, Integer length) LISA_IU(DOWNCHRS, 6, 0);
 pascal Integer CompStrMagnitude(CompStrP string1, CompStrP string2, Boolean veryWeak) LISA_IU(COMPSTRM, 10, 2);
 pascal Integer CompChrMagnitude(CompChrP char1, CompChrP char2, Integer length1, Integer length2, Boolean veryWeak) LISA_IU(COMPCHRM, 14, 2);
-pascal Boolean CompareChar(char ch1, char ch2, KindOfCompare kind) LISA_IU(COMPAREC, 6, 2);
-pascal void CharsMatching(char ch, KindOfCompare kind, CompChrP matchingChars, Integer *nOfMatchigChars) LISA_IU(CHARSMAT, 12, 0);
+pascal Boolean CompareChar(Integer ch1, Integer ch2, KindOfCompare kind) LISA_IU(COMPAREC, 6, 2);
+pascal void CharsMatching(Integer ch, KindOfCompare kind, CompChrP matchingChars, Integer *nOfMatchigChars) LISA_IU(CHARSMAT, 12, 0);
 pascal Boolean CompStrIdentity(CompStrP string1, CompStrP string2, KindOfCompare kind) LISA_IU(COMPSTRI, 10, 2);
 pascal Boolean CompChrIdentity(CompChrP char1, CompChrP char2, Integer length1, Integer length2, KindOfCompare kind) LISA_IU(COMPCHRI, 14, 2);
 

@@ -76,7 +76,7 @@ pascal void SetString(StringHandle sh, const unsigned char *str) LISA_IU(SETSTRI
 pascal void SetWindTitle(WindowPeek window, const unsigned char *title) LISA_IU(SETWINDT, 8, 0);
 pascal void ShowWindow(WindowPeek window) LISA_IU(SHOWWIND, 4, 0);
 pascal void TopActive(void) LISA_IU(TOPACTIV, 0, 0);
-pascal char UpShift(char ch) LISA_IU(UPSHIFT, 2, 2);
+pascal char UpShift(Integer ch) LISA_IU(UPSHIFT, 2, 2);
 pascal void WindowSize(WindowPeek window, Integer width, Integer height, Boolean fUpdate) LISA_IU(WINDOWSI, 10, 0);
 
 #endif

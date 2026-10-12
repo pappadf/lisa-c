@@ -23,8 +23,19 @@ pointers) are always redirected, as are LEA/PEA/MOVE of code addresses.
 The unit and segment tables (tools/lisa_tables.py) are the PASLIB closure,
 or with --tool the SYS1LIB closure of an Office System tool.
 
-usage: elf2lisa.py [--tool] input.elf output.obj
+A configurable driver (--driver; lisalink.py --driver) is written the way
+the OS's own SYSTEM.CD_ files are: VersionCtrl, Executable (one segment),
+ModuleName, StartAddress, CodeBlock, EndBlock, EOFMark.  LOAD_DRIVER copies
+its code into the driver space wherever there is room and enters it at the
+first byte, with no relocation, so the code must not depend on its address.
+Driver sources are compiled with -mpcrel; the absolute references library
+code still makes to code in the segment (JSR/JMP/LEA/PEA abs.L) are rewritten
+to their d16(PC) forms, padded with a NOP, and any other absolute reference
+is an error.
+
+usage: elf2lisa.py [--tool | --driver] input.elf output.obj
   --tool: Office System tool: SYS1LIB unit/segment closure and tool VersionCtrl
+  --driver: configurable driver (SYSTEM.CD_ file)
 """
 import os
 import re
@@ -164,6 +175,9 @@ def build(elf, tool=False):
             tseg = seg_of(target) if shndx != 0 else None
             if tseg is None:
                 continue                                    # not a code address
+            if LINKER_SYMBOL.match(sname):
+                continue                                    # a linker-script address (the data image in
+                                                            # SEG1, read once at startup): absolute
             if rtype in (R_68K_PC16, R_68K_PC8, R_68K_PC32, R_68K_16, R_68K_8):
                 if site_seg != tseg:
                     sys.exit(f'{secname}@{r_off:#x}: PC-relative/short reference to {sname} in another segment')
@@ -238,11 +252,77 @@ def build(elf, tool=False):
     return bytes(out), len(segs), len(descs), redirected
 
 
+# abs.L forms whose d16(PC) form is the next opcode and 2 bytes shorter
+PCREL_FORMS = [(0xFFFF, 0x4EB9, 'JSR'), (0xFFFF, 0x4EF9, 'JMP'), (0xF1FF, 0x41F9, 'LEA'), (0xFFFF, 0x4879, 'PEA')]
+
+
+def build_driver(elf):
+    img, base = elf.section('SEG1')
+    if img is None:
+        sys.exit('no SEG1 section: link with tools/lisalink.py --driver')
+    img = bytearray(img)
+    if elf.entry != base:
+        sys.exit(f'the entry point is at {elf.entry:#x}, not the start of the code ({base:#x})')
+    rodata = elf.symbol('__driver_rodata')
+    end = base + len(img)
+    rewritten = 0
+    for r_off, rtype, symi, addend in elf.relas('SEG1'):
+        sname, svalue, stype, shndx = elf.syms[symi]
+        target = svalue + addend
+        if shndx == 0 or not base <= target <= end:
+            sys.exit(f'{r_off:#x}: reference to {sname} ({target:#x}), outside the driver')
+        if rtype in (R_68K_PC16, R_68K_PC8, R_68K_PC32):
+            continue
+        if rtype != R_68K_32 or r_off >= rodata:
+            where = 'constant data' if r_off >= rodata else 'code'
+            sys.exit(f'{r_off:#x}: absolute reference to {sname} in {where}: a driver must be '
+                     f'position-independent (no code or data addresses in initialized tables)')
+        off = r_off - base
+        op = struct.unpack_from('>H', img, off - 2)[0]
+        for mask, abs_op, name in PCREL_FORMS:
+            if op & mask == abs_op:
+                break
+        else:
+            sys.exit(f'{r_off:#x}: absolute reference to {sname} (opcode {op:04x}): a driver must be '
+                     f'position-independent; compile it with -mpcrel')
+        disp = target - r_off                       # d16(PC): PC = the extension word's address
+        if not -32768 <= disp <= 32767:
+            sys.exit(f'{r_off:#x}: {name} to {sname} out of d16(PC) range')
+        struct.pack_into('>HhH', img, off - 2, op + 1, disp, 0x4E71)     # ... d16(PC); NOP
+        rewritten += 1
+    if len(img) % 2:
+        img.append(0)
+    if len(img) + 8 > 32767:
+        sys.exit(f'the driver is {len(img)} bytes (> 32 KB)')
+
+    out = bytearray()
+    out += record(0x99, bytes(24))                                   # VersionCtrl
+    jt_len = 2 + 12 + 2 + 6
+    pos = len(out) + 4 + 40 + jt_len
+    mod = record(0x80, name8('MainProg') + name8('') + struct.pack('>L', 0))
+    start = record(0x84, struct.pack('>LL', 0, 0))
+    cb = record(0x85, struct.pack('>L', base - 8) + bytes(img))
+    hdr = struct.pack('>L9L', JT_LADDR, jt_len, 0, 0, 0x100, 0x100, 0x2800, 0x20000, 0x1000, 0x20000)
+    jt = struct.pack('>H', 1) + struct.pack('>LHHL', pos + len(mod) + len(start), 0, len(cb), base - 8)
+    jt += struct.pack('>HHL', 1, 0x4EF9, base)                         # the entry: the first byte
+    out += record(0x98, hdr + jt)                                     # Executable
+    out += mod + start + cb + record(0x81, struct.pack('>L', len(img)))
+    out += record(0x00, b'')                                          # EOFMark
+    out += bytes(-len(out) % 512)
+    return bytes(out), len(img), rewritten
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     if len(args) != 2:
         sys.exit(__doc__)
     elf = Elf(args[0])
+    if '--driver' in sys.argv:
+        obj, size, nrew = build_driver(elf)
+        open(args[1], 'wb').write(obj)
+        print(f'{args[1]}: driver, {size} bytes of code, {nrew} absolute references made PC-relative',
+              file=sys.stderr)
+        return
     obj, nseg, ndesc, nred = build(elf, tool='--tool' in sys.argv)
     open(args[1], 'wb').write(obj)
     print(f'{args[1]}: {nseg} segment(s), {ndesc} jump-table entries, {nred} references redirected',

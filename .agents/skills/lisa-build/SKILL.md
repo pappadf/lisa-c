@@ -2,9 +2,10 @@
 name: lisa-build
 description: >
   Build C programs for the Apple Lisa with lisa-c: add a new program, build a
-  Workshop program or a desktop-tool floppy, understand the pipeline (Retro68
-  GCC -> lisalink -> elf2lisa -> mklisafs), what C library features exist,
-  the memory layout and the current limitations.
+  Workshop program, a desktop-tool floppy or a configurable device driver,
+  understand the pipeline (Retro68 GCC -> lisalink -> elf2lisa -> mklisafs),
+  what C library features exist, the memory layout and the current
+  limitations.
 ---
 # Building Lisa programs with lisa-c
 
@@ -15,7 +16,10 @@ description: >
    the program, and its headers are on the include path. An app kept in its
    own repository passes its source directory instead:
    `make -C path/to/lisa-c PROG=<name> SRCDIR=$PWD/src tool` (output in
-   lisa-c's `build/`).
+   lisa-c's `build/`). Code shared by several programs goes in other
+   directories passed as `LIBDIRS='$PWD/lib ...'`: their `.c` files are
+   compiled in and their headers are on the include path (no two source
+   files may have the same name).
 2. Workshop (console) program: an ordinary `int main(void)` using stdio.
    Build with `make PROG=<name>`; `make PROG=<name> run` runs it and saves
    `build/emu-<name>/run.png`.
@@ -25,7 +29,18 @@ description: >
    the program name), the floppy's name with `DISKNAME=` (default: the tool
    name) and the tool number with `TOOLNUM=` (default 20; use numbers above
    16, which the Office System does not know).
-4. To make it a regression test, put a Workshop program in `tests/<name>/`
+4. Configurable driver (a `SYSTEM.CD_<name>` file): define
+   `pascal int16_t DRIVER(params *p)` and switch on `p->fnctn_code`
+   (`#include "lisa_driver.h"`; copy `examples/loopdrv`). Build with
+   `make PROG=<name> driver` -> `build/<name>.drv`. No writable globals (keep
+   state in a `GETSPACE` control block in `p->configptr->cb_addr`); the code is
+   compiled `-mpcrel` and must not store code or data addresses in initialized
+   tables. Complete each request with `ADJ_IO_CNT(0, ...)` then `UNBLK_REQ`.
+   To ship it with a tool, list it in the tool's floppy files
+   (`TOOLFILES=SYSTEM.CD_<NAME>=build/<name>.drv`) and install it at run time
+   as `examples/drvtest` does (copy to the boot volume, `lisa_cdkill`,
+   `lisa_cdmake`, `lisa_mount`; open a sequential device as `-<DEV>-X`).
+5. To make it a regression test, put a Workshop program in `tests/<name>/`
    (optionally `input.txt`) and add its reference screenshot as
    `$(EXPECT)/<name>/expected.png`.
 
@@ -40,6 +55,10 @@ description: >
 - Lisa OS calls directly: `#include "lisa_os.h"` (generated; `lisa_open`,
   `lisa_make_dataseg`, `lisa_info_process`, `lisa_delay_time`, ...). Each takes
   `int16_t *ecode` first; Pascal strings (length byte first) for paths.
+  Configurable drivers: `lisa_cdinfo`/`lisa_cdkill`/`lisa_cdmake` attach and
+  detach a driver at a position at run time (then `lisa_mount` the device); build the position with
+  `CD_POS(slot, chan, dev)` (1-based: Serial A = `CD_POS(10, 1, 0)`, Serial B =
+  `CD_POS(10, 2, 0)`), the info is a `cd_infobuf` (`lisa/ostypes.h`).
 - Lisa libraries: `#include "lisa/desktop.h"` (all 42 units) or a single
   `lisa/<unit>.h` (quickdraw, events, windows, folders, menus, alertmgr,
   filercomm, scrap, fieldedit, fontmgr, wmlsb, wmlgrow, wmlcrs, hwint,

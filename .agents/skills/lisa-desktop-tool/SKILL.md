@@ -31,7 +31,25 @@ suffixes. To ship a document on the floppy, pass `DISKARGS='--document NAME
 Installing: insert the floppy in LOS and open it (no Repair needed). Tear off
 a document and open it: the Desktop Manager starts the tool (`Make_Process`). `emu/run-los-tool.sh` scripts this.
 Opening the *tool* icon itself also starts it, but as `fcNone` with no
-document (no prefix): test with a torn-off document.
+document (no prefix): test a document tool with a torn-off document, and a
+tool without documents (below) from its icon.
+
+## Two kinds of tool
+
+- **Document tools** (LisaWrite, LisaDraw, `examples/hellotool`): the floppy
+  gets a "<name> Paper" stationery pad; tearing off a sheet makes a document,
+  and opening it starts the tool with `fcResume` and the document's prefix.
+- **Tools without documents** (the Calculator, the Clock): no pad.  The user
+  opens the tool's own icon; the Desktop Manager starts it with `fcNone` and
+  gives it a window.  Build with `make PROG=<name> TOOLONLY=1 tool` (the
+  tool's label says "tools only" and its catalog record `noDocs`, as the
+  Desktop Manager marks the Calculator), and set the window it gets with
+  `TOOLWINDOW=top,left,bottom,right` (default 40,10,290,640; a full
+  document-sized window is 33,2,314,716).  Handle `fcNone` like `fcResume`
+  with no prefix.  Such a tool can still own documents that come to exist
+  another way (a paste of its Clipboard references, for example).
+- Test a tool without documents with `make test-toolonly-<name>`, or run it
+  with `TOOLONLY=1 emu/run-los-tool.sh` (it opens the tool's icon).
 
 ## Startup (order matters)
 

@@ -20,7 +20,7 @@ pascal void PsPortName(Integer Port, THsp shandle) LISA_IU(PSPORTNA, 6, 0);
 pascal void PsPortToDevName(Integer Port, unsigned char *DevName) LISA_IU(PSPORTTO, 6, 0);
 pascal void PsPreemptive(void) LISA_IU(PSPREEMP, 0, 0);
 pascal void PsNonPreemptive(void) LISA_IU(PSNONPRE, 0, 0);
-pascal void PsNumToStr(TC c, TC w, TPsp pstr, char z) LISA_IU(PSNUMTOS, 10, 0);
+pascal void PsNumToStr(TC c, TC w, TPsp pstr, Integer z) LISA_IU(PSNUMTOS, 10, 0);
 pascal TF FClrBitmap(BitMap *bits, const Rect *rCheck) LISA_IU(FCLRBITM, 8, 2);
 pascal void InitDeBug(void) LISA_IU(INITDEBU, 0, 0);
 pascal TC PrAnd(TC c1, TC c2) LISA_IU(PRAND, 4, 2);

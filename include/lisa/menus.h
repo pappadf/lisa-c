@@ -47,7 +47,7 @@ pascal void InitMenus(void) LISA_IU(INITMENU, 0, 0);
 pascal void InsertMenu(MenuInfo *menu, Integer beforeId) LISA_IU(INSERTME, 6, 0);
 pascal void MarkItem(MenuInfo *menu, Integer item, Integer whichMark) LISA_IU(MARKITEM, 8, 0);
 pascal void MenuSelect(Point startPt, Integer *whichMenu, Integer *whichItem) LISA_IU(MENUSELE, 12, 0);
-pascal void MenuKey(char ch, Integer *whichMenu, Integer *whichItem) LISA_IU(MENUKEY, 10, 0);
+pascal void MenuKey(Integer ch, Integer *whichMenu, Integer *whichItem) LISA_IU(MENUKEY, 10, 0);
 pascal void ReadMenu(void **menuFile, MenuInfo *menu) LISA_IU(READMENU, 8, 0);
 pascal void SetItem(MenuInfo *menu, Integer item, ItemPtr itemString) LISA_IU(SETITEM, 10, 0);
 /* enableFlags is a Pascal packed array of boolean: item i (0 = the whole

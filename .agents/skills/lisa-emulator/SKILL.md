@@ -59,10 +59,20 @@ Run: `gs-headless --speed=turbo rom=<rom> model=lisa script=<file>`.
 - Runs are deterministic: the same script gives byte-identical screenshots.
 - Writes to disk images stay in a delta, not in the source file; use
   `machine.floppy.drive.0.export` (or `machine.hd.save`) to get them out.
+- `run-los-tool.sh` takes `TOOLONLY=1` for a tool without stationery (it
+  double-clicks the tool's icon, the first one on such a diskette, instead of
+  tearing off a sheet), `POST=file` (commands after the tool's window has
+  opened), `PRE=file` (granny-smith commands to run right
+  after boot, e.g. `appletalk.afp.volumes.add("Name", "/host/dir")` to
+  publish an AppleShare volume on the emulated network; the Lisa's Serial B is
+  on that network) and `SAVE=file.dc42` (the floppy as the Lisa left it, to
+  read back with `tools/lisadisk.py`).
 - Insert floppies after boot: a fresh Lisa may try to start from the floppy,
   and lisa-c floppies are not bootable.
 - Icon and button positions on a single-tool diskette are
-  fixed (see `run-los-tool.sh`): the stationery pad at (70, 58), the tool icon
+  fixed (see `run-los-tool.sh`) when the tool's name sorts after "Empty
+  Folders" (the desktop lays out new icons in reverse name order): the
+  stationery pad at (70, 58), the tool icon
   at (191, 58), a torn-off document at (36, 55); a set-aside document goes to
   the bottom left of the desktop (58, 338). Opening the tool icon starts the
   tool without a document (fcNone), in a smaller window than a document's.

@@ -108,7 +108,7 @@ pascal TW WShLft(TW w, TW cbitSh) LISA_IU(WSHLFT, 4, 2);
 pascal TW WShRt(TW w, TW cbitSh) LISA_IU(WSHRT, 4, 2);
 pascal void AsgnField(TP p, TW ib, TW mskNotFld, TW val, TC cbitSh) LISA_IU(ASGNFIEL, 12, 0);
 pascal TW ValOfField(TP p, TW ib, TW mskNotFld, TC cbitSh) LISA_IU(VALOFFIE, 10, 2);
-pascal char UpperCh(char ch) LISA_IU(UPPERCH, 2, 2);
+pascal char UpperCh(Integer ch) LISA_IU(UPPERCH, 2, 2);
 pascal void MakeSpUpper(unsigned char *sp) LISA_IU(MAKESPUP, 4, 0);
 
 #endif

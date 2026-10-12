@@ -134,7 +134,7 @@ pascal void CkFmSetUp(THckfm hckfm, TF fInit, TSetIdMu setIdMuActv) LISA_IU(CKFM
 pascal void CkfmShow(THckfm hckfm, TF fInit) LISA_IU(CKFMSHOW, 6, 0);
 pascal void CkfmTrkMse(THckfm hckfm, WindowPtr pWnd) LISA_IU(CKFMTRKM, 8, 0);
 pascal void CkfmKeys(THckfm hckfm, TB iMu, TB iBtn) LISA_IU(CKFMKEYS, 8, 0);
-pascal void CkfmAddCh(THckfm hckfm, char ch) LISA_IU(CKFMADDC, 6, 0);
+pascal void CkfmAddCh(THckfm hckfm, Integer ch) LISA_IU(CKFMADDC, 6, 0);
 pascal TF FCkfmNxtKey(THckfm hckfm, TB *iMuNxt, TB *iBtnNxt) LISA_IU(FCKFMNXT, 12, 2);
 pascal void CkfmSp(THckfm hckfm, TB iMu, TB iBtn, unsigned char *sp, TF fNew) LISA_IU(CKFMSP, 14, 0);
 pascal TF FCkfmHit(THckfm hckfm, TB iMu, TB iBtn) LISA_IU(FCKFMHIT, 8, 2);
@@ -147,7 +147,7 @@ pascal void BtnErase(const TBtn *btn) LISA_IU(BTNERASE, 4, 0);
 pascal void BtnFill(const TBtn *btn, TF fFlip) LISA_IU(BTNFILL, 6, 0);
 pascal void BtnPtSp(const TBtn *btn, Point *ptSp, TC *dhSp) LISA_IU(BTNPTSP, 12, 0);
 pascal void BtnWrite(const TBtn *btn, const unsigned char *sp) LISA_IU(BTNWRITE, 8, 0);
-pascal void BtnAddCh(const TBtn *btn, char ch) LISA_IU(BTNADDCH, 6, 0);
+pascal void BtnAddCh(const TBtn *btn, Integer ch) LISA_IU(BTNADDCH, 6, 0);
 pascal void BtnBkSp(const TBtn *btn) LISA_IU(BTNBKSP, 4, 0);
 pascal void BtnBind(TLx *lx) LISA_IU(BTNBIND, 4, 0);
 pascal void BtnSetSp(const TBtn *btn, const unsigned char *sp, TF showIt) LISA_IU(BTNSETSP, 10, 0);

@@ -13,7 +13,8 @@
 # (LISA_ROM, LOS_IMAGE, by default media/lisa.rom and media/los31.image; see
 # emu/env.sh), served from the same local server; otherwise links to copies on
 # archive.org (the two halves of the rev-H ROM and an installed LOS 3.1
-# ProFile), which the page fetches itself.  MEDIA=archive forces the links.
+# ProFile, or LOS_URL), which the page fetches itself.  MEDIA=archive forces
+# the links.
 #
 # Everything is served from one local origin (no CORS, nothing published).
 # In a GitHub Codespace, VS Code forwards the port; the script prints both the
@@ -31,7 +32,7 @@ STAGE="$LISA_C/build/serve"
 # archive.org copies (as on granny-smith's Boot Shelf)
 ROM_A="https://ia600103.us.archive.org/view_archive.php?archive=/21/items/lisa-software/Lisa%20Software.zip&file=Lisa%20Software%2Ffirmware%2F341-0175-H.BIN"
 ROM_B="https://ia600103.us.archive.org/view_archive.php?archive=/21/items/lisa-software/Lisa%20Software.zip&file=Lisa%20Software%2Ffirmware%2F341-0176-H.BIN"
-LOS_URL="https://ia600806.us.archive.org/view_archive.php?archive=/22/items/apple-lisa-profile-hd-disk-images-for-lisaem-and-idle-lisa-office-system-3.1-lis/IDLE_LOS3.1-after1stBoot.zip&file=profile.raw"
+LOS_URL="${LOS_URL:-https://ia600806.us.archive.org/view_archive.php?archive=/22/items/apple-lisa-profile-hd-disk-images-for-lisaem-and-idle-lisa-office-system-3.1-lis/IDLE_LOS3.1-after1stBoot.zip&file=profile.raw}"
 
 # ---- the emulator ----------------------------------------------------------
 if [ ! -f "$WEB/web/index.html" ]; then

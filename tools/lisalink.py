@@ -10,7 +10,12 @@ crt0 and also carries the initial image of the data segment (.data plus
 Pass 2 links with a generated script and --emit-relocs; elf2lisa.py then
 routes cross-segment code references through the jump table.
 
-usage: lisalink.py out.elf [gcc link args...]
+A configurable driver (--driver) is one segment and nothing else: its code,
+then its constants, and no writable data.  It is linked at SEG1's address
+like a program's first segment, with --emit-relocs so that elf2lisa.py can
+make the absolute references left in library code PC-relative.
+
+usage: lisalink.py [--driver] out.elf [gcc link args...]
 """
 import os
 import re
@@ -138,14 +143,45 @@ def real_ld_flags(tmp):
     return ['-B' + d + '/']
 
 
+DRIVER_SCRIPT = f"""ENTRY(_driver_entry)
+SECTIONS
+{{
+    SEG1 0x20008 : {{
+        KEEP(*(.text.entry))
+        *(.text .text.*)
+        __driver_rodata = .;
+        *(.rodata .rodata.*)
+        . = ALIGN(4);
+    }}
+    .data : {{ *(.data .data.*) *(.sdata .sdata.*) }}
+    .bss (NOLOAD) : {{ *(.bss .bss.*) *(.sbss .sbss.*) *(COMMON) }}
+    /DISCARD/ : {{ *(.comment) *(.note*) *(.eh_frame*) *(.debug*) }}
+    ASSERT(SIZEOF(.data) + SIZEOF(.bss) == 0, "a driver has no writable globals: keep state in its control block")
+    ASSERT(SIZEOF(SEG1) <= {SEG_LIMIT}, "a driver is one segment of at most 32 KB")
+}}
+"""
+
+
+def link_driver(out, args, common):
+    tmp = out[:-4] if out.endswith('.elf') else out
+    open(tmp + '.ld', 'w').write(DRIVER_SCRIPT)
+    subprocess.run([CC] + common + ['-Wl,-e,_driver_entry', '-T', tmp + '.ld', '-Wl,--emit-relocs', '-Wl,--gc-sections',
+                                    f'-Wl,-Map={tmp}.map', '-o', out] + args, check=True)
+    print(f'{out}: driver, {section_size(out, "SEG1")} bytes', file=sys.stderr)
+
+
 def main():
-    out, args = sys.argv[1], sys.argv[2:]
+    driver = sys.argv[1:2] == ['--driver']
+    argv = sys.argv[2:] if driver else sys.argv[1:]
+    out, args = argv[0], argv[1:]
     tmp = out[:-4] if out.endswith('.elf') else out
     common = ['-nostdlib', '-static', '-Wl,--no-warn-rwx-segments', '-Wl,--build-id=none',
-              '-Wl,--no-warn-execstack',
-              # Retro68's driver passes `-elf2mac` for its wrapper; the real ld
-              # reads that as "-e lf2mac".  Set the entry point explicitly.
-              '-Wl,-e,_start'] + real_ld_flags(tmp)
+              '-Wl,--no-warn-execstack'] + real_ld_flags(tmp)
+    if driver:
+        return link_driver(out, args, common)
+    # Retro68's driver passes `-elf2mac` for its wrapper; the real ld reads
+    # that as "-e lf2mac".  Set the entry point explicitly.
+    common.append('-Wl,-e,_start')
 
     open(tmp + '.pass1.ld', 'w').write(pass1_script())
     subprocess.run([CC] + common + ['-T', tmp + '.pass1.ld', f'-Wl,-Map={tmp}.pass1.map', '-o',

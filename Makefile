@@ -29,11 +29,18 @@ LIBGCC  := $(shell $(CC) -m68000 -print-libgcc-file-name 2>/dev/null)
 LIBS     = build/lib/liblisa.a build/lib/liblisaiu.a $(SYSROOT)/libc.a $(SYSROOT)/libm.a $(LIBGCC)
 
 # A program is every .c file in SRCDIR (default examples/PROG or tests/PROG;
-# an app kept elsewhere passes SRCDIR=/path/to/its/sources).
+# an app kept elsewhere passes SRCDIR=/path/to/its/sources), plus every .c
+# file in the directories LIBDIRS lists (code shared by several programs; the
+# file names must differ from SRCDIR's).  Their headers are on the include path.
 PROG    ?= hello
 SRCDIR   = $(firstword $(wildcard examples/$(PROG) tests/$(PROG)))
-SRCS     = $(if $(SRCDIR),$(wildcard $(SRCDIR)/*.c))
-OBJS     = $(patsubst $(SRCDIR)/%.c,build/$(PROG)/%.o,$(SRCS))
+LIBDIRS ?=
+SRCS     = $(if $(SRCDIR),$(wildcard $(SRCDIR)/*.c)) $(foreach d,$(LIBDIRS),$(wildcard $(d)/*.c))
+OBJS     = $(patsubst %.c,build/$(PROG)/%.o,$(notdir $(SRCS)))
+vpath %.c $(SRCDIR) $(LIBDIRS)
+ifneq ($(words $(notdir $(SRCS))),$(words $(sort $(notdir $(SRCS)))))
+$(error PROG=$(PROG): two source files share a name (SRCDIR and LIBDIRS): $(notdir $(SRCS)))
+endif
 TESTS   := $(filter-out headers,$(notdir $(patsubst %/,%,$(wildcard tests/*/))))
 
 # ENTRIES: the intrinsic libraries' entry points (link name -> jump-vector
@@ -45,7 +52,8 @@ TESTS   := $(filter-out headers,$(notdir $(patsubst %/,%,$(wildcard tests/*/))))
 PRIVATE ?= ../lisa-c-private
 ENTRIES ?= data/entries.tsv
 EXPECT  ?= $(PRIVATE)/tests
-TOOL_TESTS := $(notdir $(patsubst %/,%,$(wildcard $(EXPECT)/tools/*/)))
+TOOL_TESTS := $(filter-out %-toolonly,$(notdir $(patsubst %/,%,$(wildcard $(EXPECT)/tools/*/))))
+TOOLONLY_TESTS := $(patsubst %-toolonly,%,$(filter %-toolonly,$(notdir $(patsubst %/,%,$(wildcard $(EXPECT)/tools/*/)))))
 
 HEADERS := $(wildcard include/lisa/*.h)
 RT_OBJS := build/rt/paslib.o build/rt/lisa.o build/rt/lisa_os.o build/rt/mem.o build/rt/posix.o
@@ -86,10 +94,10 @@ build/rt/lisa_os.o: build/rt/lisa_os.S
 build/lib/liblisa.a: $(RT_OBJS) | build/lib
 	rm -f $@ && $(AR) rcs $@ $^
 
-build/$(PROG)/%.o: $(SRCDIR)/%.c $(wildcard $(SRCDIR)/*.h) runtime/lisa.h build/include/lisa_os.h \
-                   build/include/lisa/traps.h $(SYSROOT)/libc.a $(HEADERS)
+build/$(PROG)/%.o: %.c $(wildcard $(SRCDIR)/*.h $(addsuffix /*.h,$(LIBDIRS))) runtime/lisa.h \
+                   build/include/lisa_os.h build/include/lisa/traps.h $(SYSROOT)/libc.a $(HEADERS)
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I$(SRCDIR) -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR) $(addprefix -I,$(LIBDIRS)) -c $< -o $@
 
 build/$(PROG).elf: build/rt/crt0.o $(OBJS) $(LIBS) tools/lisalink.py
 	@[ -n "$(OBJS)" ] || { echo "no sources for PROG=$(PROG) (SRCDIR=$(SRCDIR))" >&2; exit 1; }
@@ -108,7 +116,8 @@ run: build/$(PROG).dc42
 
 # Run in the emulator and compare the screen with $(EXPECT)/<name>/expected.png
 # (SKIP when there is no reference screenshot).
-test: test-headers $(addprefix test-,$(TESTS)) $(addprefix test-tool-,$(TOOL_TESTS))
+test: test-headers $(addprefix test-,$(TESTS)) $(addprefix test-tool-,$(TOOL_TESTS)) \
+      $(addprefix test-toolonly-,$(TOOLONLY_TESTS))
 
 # The headers against the Pascal layouts (record sizes, field offsets,
 # parameter sizes): a file of compile-time assertions.
@@ -133,9 +142,20 @@ test-%:
 # Office System mounts it without asking to Repair it.  DISKARGS: more
 # tools/mklisafs.py arguments, e.g. --document NAME TOOLNUM SUFFIX=FILE to put
 # a ready-made document on the floppy.
-TOOLNUM ?= 20
+# TOOLFILES: more files for the floppy, as NAME=PATH (e.g. a driver the tool
+# installs, SYSTEM.CD_LOOP=build/loopdrv.drv; a build/<name>.drv is built first).
+TOOLNUM ?= $(or $(TOOLNUM_$(PROG)),20)
 TOOLNAME_hellotool := Hello
+TOOLNAME_drvtest := Loop Driver
+TOOLNUM_drvtest := 24
+TOOLFILES_drvtest := SYSTEM.CD_LOOP=build/loopdrv.drv
 TOOLNAME ?= $(or $(TOOLNAME_$(PROG)),$(PROG))
+TOOLFILES ?= $(TOOLFILES_$(PROG))
+# TOOLONLY=1: a tool without stationery, opened from its own icon (fcNone),
+# like the Calculator; no "<name> Paper" pad.  TOOLWINDOW=top,left,bottom,right:
+# the window such a tool gets (default 40,10,290,640).  See tools/mklisafs.py.
+TOOLONLY ?= $(TOOLONLY_$(PROG))
+TOOLWINDOW ?= $(TOOLWINDOW_$(PROG))
 DISKNAME ?= $(TOOLNAME)
 
 build/%.phrase: $(SRCDIR)/%.phrase tools/phrasec.py | build
@@ -147,7 +167,11 @@ tool: build/$(PROG).phrase
 	rm -rf build/tool-$(PROG) && mkdir -p build/tool-$(PROG)
 	cp build/$(PROG).obj 'build/tool-$(PROG)/{T$(TOOLNUM)}obj'
 	cp build/$(PROG).phrase 'build/tool-$(PROG)/{T$(TOOLNUM)}PHRASE'
-	tools/mkdisk.sh -n '$(DISKNAME)' -t '$(TOOLNAME)' $(DISKARGS) build/$(PROG)-tool.dc42 build/tool-$(PROG)/*
+	@for f in $(TOOLFILES); do src=$${f#*=}; case $$src in build/*.drv) \
+	    $(MAKE) --no-print-directory PROG=$$(basename $$src .drv) driver || exit 1;; esac; \
+	    cp "$$src" "build/tool-$(PROG)/$${f%%=*}" || exit 1; done
+	tools/mkdisk.sh -n '$(DISKNAME)' -t '$(TOOLNAME)' $(if $(TOOLONLY),--tool-only) \
+	    $(if $(TOOLWINDOW),--window $(TOOLWINDOW)) $(DISKARGS) build/$(PROG)-tool.dc42 build/tool-$(PROG)/*
 
 # make PROG=hellotool serve     -> build the tool's floppy and run it interactively in
 #                                 granny-smith's web build (emu/serve.sh prints the link)
@@ -160,6 +184,40 @@ test-tool-%:
 	@if cmp -s build/emu-tool-$*/6-later.png $(EXPECT)/tools/$*/opened.png && \
 	    cmp -s build/emu-tool-$*/8-closed.png $(EXPECT)/tools/$*/closed.png; then echo "PASS: tool $*"; \
 	 else echo "FAIL: tool $* (see build/emu-tool-$*/)"; exit 1; fi
+
+# make test-toolonly-hellotool   -> the same tool built without stationery
+#                                   (TOOLONLY=1), opened from its own icon;
+#                                   compare with $(EXPECT)/tools/hellotool-toolonly/
+test-toolonly-%:
+	@$(MAKE) --no-print-directory PROG=$* TOOLONLY=1 TOOLWINDOW=40,60,280,660 tool >/dev/null
+	@cp build/$*-tool.dc42 build/$*-toolonly.dc42
+	@TOOLONLY=1 CLOSE=1 LATER=200000000 emu/run-los-tool.sh build/$*-toolonly.dc42 build/emu-tool-$*-toolonly >/dev/null
+	@if cmp -s build/emu-tool-$*-toolonly/6-later.png $(EXPECT)/tools/$*-toolonly/opened.png && \
+	    cmp -s build/emu-tool-$*-toolonly/8-closed.png $(EXPECT)/tools/$*-toolonly/closed.png; then \
+	    echo "PASS: tool $* (without stationery)"; \
+	 else echo "FAIL: tool $* without stationery (see build/emu-tool-$*-toolonly/)"; exit 1; fi
+
+# ---- Configurable drivers -----------------------------------------------------
+# make PROG=loopdrv driver       -> build/loopdrv.drv, a SYSTEM.CD_ file
+# A driver is every .c file in SRCDIR, defining pascal int16_t DRIVER(params *)
+# (runtime/lisa_driver.h).  It is compiled position-independent (-mpcrel),
+# linked into one segment after runtime/driver.S (the entry branch and the OS
+# service thunks) with picolibc and libgcc, and may have no writable globals.
+DRV_CFLAGS := $(filter-out -fno-pic,$(CFLAGS)) -mpcrel
+DRV_OBJS    = $(patsubst $(SRCDIR)/%.c,build/drv-$(PROG)/%.o,$(wildcard $(SRCDIR)/*.c))
+
+build/rt/driver.o: runtime/driver.S | build/rt
+	$(CC) $(CFLAGS) -c $< -o $@
+build/drv-$(PROG)/%.o: $(SRCDIR)/%.c $(wildcard $(SRCDIR)/*.h) runtime/lisa_driver.h $(SYSROOT)/libc.a
+	@mkdir -p $(dir $@)
+	$(CC) $(DRV_CFLAGS) -I$(SRCDIR) -c $< -o $@
+build/$(PROG)-drv.elf: build/rt/driver.o $(DRV_OBJS) $(SYSROOT)/libc.a tools/lisalink.py
+	@[ -n "$(DRV_OBJS)" ] || { echo "no sources for PROG=$(PROG) (SRCDIR=$(SRCDIR))" >&2; exit 1; }
+	LISA_CROSS=$(CROSS) python3 -I tools/lisalink.py --driver $@ build/rt/driver.o $(DRV_OBJS) \
+	    -Wl,--start-group $(SYSROOT)/libc.a $(LIBGCC) -Wl,--end-group
+build/$(PROG).drv: build/$(PROG)-drv.elf tools/elf2lisa.py
+	python3 -I tools/elf2lisa.py --driver $< $@
+driver: build/$(PROG).drv
 
 # ---- Regenerating the headers ---------------------------------------------
 # include/lisa/<unit>.h and tests/headers/layout.c are generated from the
@@ -190,6 +248,6 @@ toolchain:
 clean:
 	rm -rf build
 
-.PHONY: all disk run test clean tool toolchain serve headers test-headers
+.PHONY: all disk run test clean tool toolchain serve headers test-headers driver
 .SECONDARY:
 .DELETE_ON_ERROR:
