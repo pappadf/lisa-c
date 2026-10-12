@@ -25,7 +25,8 @@
 # emulated AppleTalk network.  POST=file adds commands after 6-later.png (the
 # script's click(x, y) and dclick(x, y) are available).  SAVE=file.dc42 finally saves
 # the diskette as the Lisa left it (granny-smith's machine.floppy.drive.0.export).
-# Emulator, ROM and LOS image: see emu/env.sh.
+# RAM=1024 boots a 1 MB Lisa (the default is 2048 KB; granny-smith's web build
+# and most real Lisas have 1 MB).  Emulator, ROM and LOS image: see emu/env.sh.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 need_emulator
@@ -56,7 +57,7 @@ fi
 PRE_LINES=""
 if [ -n "${PRE:-}" ]; then PRE_LINES="$(cat "$PRE")"; fi
 cat > "$OUT/tool.script" <<EOF
-machine.boot model="lisa" ram=2048 rom="$ROM"
+machine.boot model="lisa" ram=${RAM:-2048} rom="$ROM"
 machine.hd.attach "$OUT/profile.image"
 assert machine.hd.pram_init(2, false) "pram_init failed"
 def click(x, y) {

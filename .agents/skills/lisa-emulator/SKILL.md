@@ -65,8 +65,10 @@ Run: `gs-headless --speed=turbo rom=<rom> model=lisa script=<file>`.
   opened), `PRE=file` (granny-smith commands to run right
   after boot, e.g. `appletalk.afp.volumes.add("Name", "/host/dir")` to
   publish an AppleShare volume on the emulated network; the Lisa's Serial B is
-  on that network) and `SAVE=file.dc42` (the floppy as the Lisa left it, to
-  read back with `tools/lisadisk.py`).
+  on that network), `SAVE=file.dc42` (the floppy as the Lisa left it, to
+  read back with `tools/lisadisk.py`) and `RAM=1024` (a 1 MB Lisa, like
+  granny-smith's web build and most real ones; the default is 2048). Test a
+  tool at 1 MB too: one that does not fit hangs on "Just a moment, please...".
 - Insert floppies after boot: a fresh Lisa may try to start from the floppy,
   and lisa-c floppies are not bootable.
 - Icon and button positions on a single-tool diskette are

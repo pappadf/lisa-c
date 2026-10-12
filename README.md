@@ -53,6 +53,7 @@ Coding agents: see `AGENTS.md` and the skills in `.agents/skills/`.
 2. `tools/lisalink.py` links in two passes and packs the code into segments:
    - Pass 1 learns the size of every function.
    - The functions are then packed into code segments of at most 32 KB: SEG*n* at MMU *n* (*n* × 128K, code at +8 after the CodeBlock header), up to 16 segments.
+   - `__lisa_init` always goes into SEG1, next to the data segment's initial image that it copies. Running in another segment, the copy needs three segments in memory at once, and on a 1 MB Lisa the Office System could not always find room: the program hung before `main`.
    - Pass 2 links with a generated script and `--emit-relocs`.
    - Both passes call Retro68's real linker (`ld.real`) rather than its Elf2Mac wrapper, and set the entry point explicitly, because the driver's `-elf2mac` flag is otherwise read as `-e lf2mac`.
 3. `tools/elf2lisa.py` writes the Workshop 3.0 object records:

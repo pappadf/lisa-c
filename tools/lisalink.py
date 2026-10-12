@@ -7,6 +7,10 @@ are then packed, in link order, into segments SEG1..SEGn mapped at MMU n
 (n * 128K, code at +8 after the CodeBlock header).  SEG1 always starts with
 crt0 and also carries the initial image of the data segment (.data plus
 .rodata, which live in RAM so that code never reads another code segment).
+__lisa_init, which copies that image into the data segment, is put in SEG1
+too: running in another segment, the copy needs three segments in memory at
+once (its own, SEG1 and the data segment), and on a 1 MB Lisa the Office
+System cannot always find room for them, so the program hangs before main.
 Pass 2 links with a generated script and --emit-relocs; elf2lisa.py then
 routes cross-segment code references through the jump table.
 
@@ -191,7 +195,8 @@ def main():
 
     segs = [[]]
     used = [image + 16]
-    for sect, file, size in sections:
+    first = [s for s in sections if s[0] == '.text.__lisa_init']
+    for sect, file, size in first + [s for s in sections if s not in first]:
         size = (size + 3) & ~3
         if size > SEG_LIMIT:
             sys.exit(f'{sect} ({file}) is {size} bytes: larger than a segment')
